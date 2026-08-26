@@ -50,6 +50,7 @@ interface Candidate {
   isSvg: boolean
   isPlatformDefault: boolean
   isFaviconIco: boolean
+  isOgImage: boolean
   score?: number
 }
 
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
       const candidates: Candidate[] = []
       const seenUrls = new Set<string>()
 
-      const addCandidate = (href: string, type: string = '', sizes: string = '') => {
+      const addCandidate = (href: string, type: string = '', sizes: string = '', isOg: boolean = false) => {
         if (!href) return
         const fullUrl = resolveUrl(href, url)
         if (seenUrls.has(fullUrl)) return
@@ -142,12 +143,18 @@ export async function GET(request: NextRequest) {
           sizeScore = parseInt(sizes.split('x')[0], 10) || 0
         }
 
+        // Strict default heuristics (regardless of domain)
+        const isNextJsDefault = fullUrl.includes('favicon.ico?favicon.')
+        const isVercelTriangle = fullUrl.endsWith('vercel.svg')
+        const isGenericPlatform = isPlatformDomain && fullUrl.includes(cleanDomain.split('.')[1] || 'default')
+
         candidates.push({
           url: fullUrl,
           size: sizeScore,
           isSvg: type === 'image/svg+xml' || fullUrl.endsWith('.svg'),
-          isFaviconIco: fullUrl.endsWith('/favicon.ico'),
-          isPlatformDefault: isPlatformDomain && fullUrl.includes(cleanDomain.split('.')[1] || 'default') // simplistic heuristic for platform defaults
+          isFaviconIco: fullUrl.endsWith('/favicon.ico') || isNextJsDefault,
+          isPlatformDefault: isNextJsDefault || isVercelTriangle || isGenericPlatform,
+          isOgImage: isOg
         })
       }
 
@@ -170,6 +177,13 @@ export async function GET(request: NextRequest) {
         addCandidate($(el).attr('href') || '', $(el).attr('type') || '', $(el).attr('sizes') || '')
       })
 
+      // Read Open Graph and Twitter Images
+      const ogImage = $('meta[property="og:image"]').attr('content')
+      if (ogImage) addCandidate(ogImage, '', '', true)
+
+      const twitterImage = $('meta[name="twitter:image"]').attr('content')
+      if (twitterImage) addCandidate(twitterImage, '', '', true)
+
       // Add default favicon
       addCandidate('/favicon.ico')
 
@@ -177,30 +191,43 @@ export async function GET(request: NextRequest) {
       for (const cand of candidates) {
         cand.score = 0
         
-        // Penalize platform domain logos severely unless we have nothing else
-        if (isPlatformDomain && cand.url.includes('favicon.ico')) cand.score -= 1000
+        // Penetrate platform defaults heavily to force fallbacks
+        if (cand.isPlatformDefault) {
+          cand.score -= 2000
+        }
 
+        // Base scores based on size
         if (cand.size >= 512) cand.score += 500
         else if (cand.size >= 192) cand.score += 400
         else if (cand.size >= 128) cand.score += 300
         else if (cand.size >= 64) cand.score += 200
         else if (cand.size > 0) cand.score += 100
+        else cand.score += 50 // valid icon but unknown size
         
         // High-res SVG is great, but tiny SVG isn't necessarily better than big PNG
-        if (cand.isSvg) cand.score += 350
+        if (cand.isSvg && !cand.isPlatformDefault) cand.score += 350
         
-        if (cand.isFaviconIco) cand.score += 10 // Last resort
+        if (cand.isFaviconIco && !cand.isPlatformDefault) cand.score += 10 // Last resort for favicons
+
+        // OpenGraph images are usually wide banners (1200x630). 
+        // We only want to use them if no other proper icon exists.
+        if (cand.isOgImage) {
+          cand.score -= 1000 // Heavily penalize so proper icons always win
+        }
       }
 
       // Sort by score descending
       candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
 
+      console.log('--- CANDIDATES FOR', urlStr, '---')
+      candidates.forEach(c => console.log(c.url, 'score:', c.score, 'isPlatform:', c.isPlatformDefault))
+      console.log('---------------------------')
+
       // 4. Test Reachability Sequentially
       for (const cand of candidates) {
         if (await checkReachability(cand.url)) {
-          // If it's a platform domain and the only thing we found was the default favicon, 
-          // we reject it and force the domain initial fallback.
-          if (isPlatformDomain && cand.isFaviconIco && cand.score! <= -900) {
+          // If it's a known platform default (e.g. Next.js generic favicon), fallback instead
+          if (cand.isPlatformDefault && cand.score! < -1000) {
             break // go to fallback
           }
           finalLogoUrl = cand.url
