@@ -58,7 +58,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
       }
 
-      const amountPaid = Number(data.amount) / 100 // Convert cents back to dollars
+      const rawAmount = data.total_amount !== undefined ? data.total_amount : data.amount
+      const amountPaid = Number(rawAmount || 0) / 100 // Convert cents back to dollars
+      
+      console.log('Webhook parsed amount:', { rawAmount, amountPaid })
+
       const websiteUrl = metadata.website_url
       const websiteName = metadata.website_name || websiteUrl
       const websiteLogo = metadata.website_logo || ''
