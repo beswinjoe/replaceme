@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
         'link[rel="icon"]',
       ]
       
-      let candidateLogo = ''
+      let candidates: string[] = []
       
       // First try to check for a manifest
       const manifestHref = $('link[rel="manifest"]').attr('href')
@@ -126,17 +126,17 @@ export async function GET(request: NextRequest) {
           if (mRes.ok) {
             const manifest = await mRes.json()
             if (manifest.icons && Array.isArray(manifest.icons) && manifest.icons.length > 0) {
-              // Prefer largest or SVG
-              const bestIcon = manifest.icons.sort((a: any, b: any) => {
+              const sortedIcons = manifest.icons.sort((a: any, b: any) => {
                 if (a.type === 'image/svg+xml') return -1
                 if (b.type === 'image/svg+xml') return 1
                 const sizeA = parseInt(a.sizes?.split('x')[0] || '0')
                 const sizeB = parseInt(b.sizes?.split('x')[0] || '0')
                 return sizeB - sizeA
-              })[0]
-              
-              if (bestIcon && bestIcon.src) {
-                candidateLogo = resolveUrl(bestIcon.src, url)
+              })
+              for (const icon of sortedIcons) {
+                if (icon.src) {
+                  candidates.push(resolveUrl(icon.src, url))
+                }
               }
             }
           }
@@ -145,31 +145,29 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // If no manifest logo, check HTML tags
-      if (!candidateLogo) {
-        for (const selector of iconSelectors) {
-          const href = $(selector).attr('href')
+      // Collect from HTML tags in priority order
+      for (const selector of iconSelectors) {
+        $(selector).each((_, el) => {
+          const href = $(el).attr('href')
           if (href) {
-            candidateLogo = resolveUrl(href, url)
-            break // Priority order gives us the best one first
+            candidates.push(resolveUrl(href, url))
           }
-        }
+        })
       }
 
-      // 3. Fallback to default favicon.ico if nothing is found
-      if (!candidateLogo) {
-        const defaultFavicon = resolveUrl('/favicon.ico', url)
-        if (await validateImageUrl(defaultFavicon)) {
-           candidateLogo = defaultFavicon
-        }
-      }
+      // Add default favicon.ico at the very end
+      candidates.push(resolveUrl('/favicon.ico', url))
 
-      // 4. Validate the chosen logo
-      if (candidateLogo) {
-        const isValid = await validateImageUrl(candidateLogo)
+      // Deduplicate candidates
+      candidates = Array.from(new Set(candidates))
+
+      // Test candidates sequentially and pick the first valid one
+      for (const candidate of candidates) {
+        const isValid = await validateImageUrl(candidate)
         if (isValid) {
-          logoUrl = candidateLogo
+          logoUrl = candidate
           logoSource = 'detected'
+          break
         }
       }
     }
