@@ -5,10 +5,9 @@ import { Header } from '@/components/Header'
 import { CheckoutModal } from '@/components/CheckoutModal'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ArrowRight, Trophy, Zap, ShieldAlert, Heart, Calendar, Clock, Crown, Activity } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
-// Wrap search params logic in Suspense to prevent Next.js build errors
 function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -21,7 +20,7 @@ function HomeContent() {
   const [replacementsCount, setReplacementsCount] = useState(0)
   const [recentReplacements, setRecentReplacements] = useState<any[]>([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
-  const [reignTime, setReignTime] = useState('00:00:00')
+  const [reignTime, setReignTime] = useState('0s')
 
   // Quick form state
   const [quickUsername, setQuickUsername] = useState('')
@@ -124,7 +123,7 @@ function HomeContent() {
       const diffMs = now - replacedDate
 
       if (diffMs <= 0) {
-        setReignTime('00h 00m 00s')
+        setReignTime('0s')
         return
       }
 
@@ -133,11 +132,12 @@ function HomeContent() {
       const minutes = Math.floor((diffSec % 3600) / 60)
       const seconds = diffSec % 60
 
-      const pad = (num: number) => String(num).padStart(2, '0')
       if (hours > 0) {
-        setReignTime(`${hours}h ${pad(minutes)}m`)
+        setReignTime(`${hours}h ${minutes}m`)
+      } else if (minutes > 0) {
+        setReignTime(`${minutes}m ${seconds}s`)
       } else {
-        setReignTime(`${minutes}m ${pad(seconds)}s`)
+        setReignTime(`${seconds}s`)
       }
     }
 
@@ -159,16 +159,6 @@ function HomeContent() {
     setCheckoutOpen(true)
   }
 
-  const formatDuration = (sec: number) => {
-    if (!sec) return ''
-    if (sec < 60) return `${Math.round(sec)}s`
-    const mins = Math.floor(sec / 60)
-    if (mins < 60) return `${mins}m`
-    const hours = Math.floor(mins / 60)
-    const remainingMins = mins % 60
-    return `${hours}h ${remainingMins}m`
-  }
-
   const timeAgo = (dateStr: string) => {
     const ms = new Date().getTime() - new Date(dateStr).getTime()
     const sec = Math.floor(ms / 1000)
@@ -183,243 +173,283 @@ function HomeContent() {
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)]">
-        <div className="text-xl font-semibold animate-pulse text-[var(--foreground)]">Loading...</div>
+        <div className="text-[15px] font-semibold animate-pulse text-[var(--secondary)]">Loading...</div>
       </div>
     )
   }
 
-  const holderUser = currentHolder?.user
-  const currentPrice = currentHolder ? Number(currentHolder.current_price) : 1.0
-  const holderUsername = holderUser?.username || 'replaceme'
+  // Derive initial/empty states safely
+  const isInitialState = replacementsCount === 0;
+  const holderUser = currentHolder?.user;
+  const currentPrice = currentHolder ? Number(currentHolder.current_price) : 1.0;
+  
+  const holderUsername = isInitialState ? 'replaceme' : (holderUser?.username || 'replaceme');
+  const holderDisplayName = isInitialState ? 'ReplaceMe' : (holderUser?.display_name || holderUsername);
+  const holderAvatar = isInitialState 
+    ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=replaceme' 
+    : (holderUser?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback');
+  const holderMessage = isInitialState ? 'Someone has to be first.' : (currentHolder?.custom_message || 'I am the reigning #1.');
 
   return (
     <>
       <Header />
 
-      <main className="flex-1 flex flex-col items-center pt-16 pb-24 px-4 max-w-5xl mx-auto w-full space-y-16">
+      <main className="flex-1 flex flex-col items-center pt-12 md:pt-16 pb-24 px-4 md:px-6 lg:px-8 max-w-[1240px] mx-auto w-full">
         
         {/* HERO SECTION */}
-        <section className="text-center space-y-6 w-full max-w-3xl flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[var(--surface)] border border-[var(--border-soft)] rounded-full text-xs font-semibold text-gray-500">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span>{Math.floor(Math.random() * 300 + 100)} online · {replacementsCount.toLocaleString()} replaced</span>
+        <section className="text-center w-full max-w-3xl flex flex-col items-center mb-12">
+          <div className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-[0.1em] mb-4">
+            The Internet's #1 Spot
           </div>
-
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[var(--foreground)]">
-            Replace #1 for <span className="text-[var(--accent)]">—</span> <span className="text-[var(--accent)]">${currentPrice.toFixed(2)}</span>
+          <h1 className="text-[44px] md:text-[56px] font-bold tracking-tight text-[var(--foreground)] leading-[1.05] mb-2">
+            Replace #1 for
           </h1>
-
-          <p className="text-lg md:text-xl text-gray-500 font-medium max-w-lg">
-            One person holds the top spot. Take it.
+          <h2 className="text-[40px] md:text-[48px] font-bold text-[var(--accent)] tracking-tight tabular-nums mb-5">
+            ${currentPrice.toFixed(2)}
+          </h2>
+          <p className="text-[15px] md:text-[16px] text-[var(--secondary)] font-medium max-w-lg mb-8">
+            One person holds the spot. Replace them and become #1.
           </p>
 
-          {/* Quick Replacement Form */}
+          {/* Replacement Input Bar */}
           <form 
             onSubmit={triggerCheckout}
-            className="w-full mt-6 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-2 flex flex-col sm:flex-row gap-2 shadow-sm focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:border-transparent transition-all"
+            className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-1.5 flex flex-col md:flex-row gap-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus-within:border-[var(--accent)] transition-all"
           >
             <input 
               type="text" 
-              placeholder="@username" 
+              placeholder="@yourusername" 
               value={quickUsername}
               onChange={(e) => setQuickUsername(e.target.value)}
-              className="flex-1 bg-transparent px-4 py-3 outline-none text-sm md:text-base placeholder-gray-400 font-medium"
+              className="flex-1 bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium"
             />
-            <div className="hidden sm:block w-px bg-[var(--border-soft)] my-2" />
+            <div className="hidden md:block w-px bg-[var(--border)] my-2" />
             <input 
               type="text" 
-              placeholder="Your message..." 
+              placeholder="Your claim..." 
               value={quickMessage}
               onChange={(e) => setQuickMessage(e.target.value)}
-              className="flex-[2] bg-transparent px-4 py-3 outline-none text-sm md:text-base placeholder-gray-400 font-medium border-t sm:border-t-0 border-[var(--border-soft)]"
+              className="flex-[2] bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium border-t md:border-t-0 border-[var(--border)]"
             />
             <button 
               type="submit"
-              className="bg-[var(--accent)] text-white px-6 py-3 rounded-xl font-bold tracking-wide hover:opacity-90 transition-opacity active:scale-95"
+              className="bg-[var(--accent)] text-white px-8 py-3 rounded-[12px] text-[15px] font-semibold tracking-wide hover:opacity-90 transition-opacity active:scale-[0.98]"
             >
-              Replace
+              Replace #1
             </button>
           </form>
-          <p className="text-xs text-gray-400 font-medium">
-            The price increases by 20% after every replacement.
-          </p>
+          <div className="flex items-center gap-3 mt-4 text-[13px] text-[var(--muted)] font-medium">
+            <span>Price increases after every successful replacement.</span>
+          </div>
         </section>
 
         {/* CURRENT #1 ROW */}
-        <section className="w-full">
-          <div className="flex items-center gap-2 mb-4 px-2">
-            <Crown className="w-5 h-5 text-yellow-500" />
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Current #1</h2>
-          </div>
-
-          <div className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 transition-all hover:border-gray-300 dark:hover:border-gray-600 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full -mr-10 -mt-10 pointer-events-none" />
+        <section className="w-full max-w-5xl mb-14">
+          <h3 className="text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 pl-1">CURRENT #1</h3>
+          
+          <div className="w-full bg-[#FFF9F5] dark:bg-[#1A1513] border border-[var(--accent)] rounded-[16px] p-5 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8 transition-all min-h-[180px]">
             
-            <img
-              src={holderUser?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'}
-              alt={holderUsername}
-              className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-2 border-[var(--border-soft)] flex-shrink-0 bg-gray-100 dark:bg-gray-800"
-            />
+            {/* LEFT: Rank & User */}
+            <div className="flex items-center gap-4 w-full md:w-auto md:min-w-[240px] flex-shrink-0">
+              <span className="text-[20px] md:text-[24px] font-bold text-[var(--accent)] w-8 text-center">#1</span>
+              <img
+                src={holderAvatar}
+                alt={holderUsername}
+                className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover border border-[#E8E3DE] dark:border-[#2A2A2A] flex-shrink-0 bg-white"
+              />
+              <div className="flex flex-col">
+                <span className="text-[22px] md:text-[28px] font-bold text-[var(--foreground)] leading-tight tracking-tight line-clamp-1">
+                  {holderDisplayName}
+                </span>
+                <span className="text-[15px] text-[var(--secondary)] font-medium mt-0.5">@{holderUsername}</span>
+              </div>
+            </div>
             
-            <div className="flex-1 text-center md:text-left space-y-3 z-10 w-full">
-              <div className="flex flex-col md:flex-row md:items-baseline md:justify-between gap-2">
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] tracking-tight">
-                    {holderUser?.display_name || holderUsername}
-                  </h3>
-                  <p className="text-[var(--accent)] font-semibold">@{holderUsername}</p>
-                </div>
-                <div className="flex items-center justify-center md:justify-end gap-2 text-sm font-medium text-gray-500">
-                  <Clock className="w-4 h-4" />
-                  Held #1 for <span className="text-[var(--foreground)] font-bold">{reignTime}</span>
-                </div>
+            {/* MIDDLE: Claim & Meta */}
+            <div className="flex-1 flex flex-col justify-center w-full min-w-0 md:px-4">
+              <div className="text-[16px] md:text-[18px] text-[var(--foreground)] font-medium leading-snug">
+                {holderMessage}
               </div>
-
-              <div className="text-lg text-gray-600 dark:text-gray-300 font-medium italic break-words">
-                &ldquo;{currentHolder?.custom_message || 'I am the reigning #1.'}&rdquo;
-              </div>
-              
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
-                {currentHolder?.website_url && (
-                  <a
-                    href={currentHolder.website_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] hover:underline"
-                  >
-                    🔗 {currentHolder.website_url.replace(/^https?:\/\//, '')}
-                  </a>
+              <div className="flex flex-wrap items-center gap-3 mt-3 text-[13px] text-[var(--secondary)] font-medium tabular-nums">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" /> Held #1 for {isInitialState ? '0s' : reignTime}
+                </span>
+                {!isInitialState && currentHolder?.website_url && (
+                  <>
+                    <span className="text-[var(--muted)]">•</span>
+                    <a
+                      href={currentHolder.website_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--accent)] hover:underline truncate max-w-[200px]"
+                    >
+                      {currentHolder.website_url.replace(/^https?:\/\//, '')}
+                    </a>
+                  </>
                 )}
               </div>
             </div>
 
-            <div className="w-full md:w-auto flex flex-col items-center md:items-end justify-center md:border-l border-[var(--border-soft)] md:pl-8 py-2 md:h-32 z-10">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Cost to Replace</span>
-              <span className="text-4xl font-bold text-[var(--foreground)] tracking-tight">${currentPrice.toFixed(2)}</span>
+            {/* RIGHT: Price & CTA */}
+            <div className="flex flex-col items-start md:items-end flex-shrink-0 w-full md:w-[180px]">
+              <span className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mb-1">
+                CURRENT PRICE
+              </span>
+              <span className="text-[32px] md:text-[38px] font-bold text-[var(--foreground)] tabular-nums tracking-tight leading-none mb-1">
+                ${currentPrice.toFixed(2)}
+              </span>
+              <span className="text-[13px] font-medium text-[var(--secondary)] mb-4 md:mb-5">
+                to replace
+              </span>
               <button 
                 onClick={triggerCheckout}
-                className="mt-3 w-full md:w-auto bg-[var(--foreground)] text-[var(--background)] px-6 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition-all active:scale-95"
+                className="w-full bg-[var(--accent)] text-white px-5 py-3 md:py-2.5 rounded-[12px] font-semibold text-[15px] hover:opacity-90 transition-all active:scale-[0.98]"
               >
-                Replace Them
+                Replace #1
               </button>
             </div>
           </div>
         </section>
 
-        {/* MAIN LEADERBOARD / HISTORY */}
-        <section className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* MAIN GRID: RECENT & ACTIVITY */}
+        <section className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(280px,0.8fr)] gap-10 lg:gap-16 items-start">
           
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight text-[var(--foreground)] mb-6">Recent Replacements</h2>
+          {/* RECENT REPLACEMENTS */}
+          <div className="w-full">
+            <h3 className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] tracking-tight mb-5">Recent Replacements</h3>
             
             <div className="space-y-3">
               {recentReplacements.map((rep, idx) => (
                 <div 
                   key={rep.id} 
-                  className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl hover:border-gray-300 dark:hover:border-gray-600 transition-colors gap-4"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[var(--surface)] border border-[var(--border)] rounded-[16px] hover:border-[var(--muted)] transition-colors gap-4"
                 >
-                  <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <span className="text-lg font-bold text-gray-300 dark:text-gray-600 w-6 text-center">
-                      #{idx + 1}
+                  <div className="flex items-center gap-4 w-full sm:w-auto flex-shrink-0">
+                    <span className="text-[15px] font-bold text-[var(--muted)] w-8 text-center tabular-nums">
+                      #{idx + 2}
                     </span>
                     <img 
                       src={rep.new_user?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'}
                       alt={rep.new_user?.username || 'user'}
-                      className="w-12 h-12 rounded-full border border-[var(--border-soft)] object-cover bg-gray-100 dark:bg-gray-800"
+                      className="w-10 h-10 rounded-full border border-[var(--border)] object-cover bg-white"
                     />
                     <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-[var(--foreground)]">
-                          {rep.new_user?.display_name || rep.new_user?.username || 'Anonymous'}
-                        </span>
-                        <span className="text-sm text-gray-500">@{rep.new_user?.username || 'anon'}</span>
-                      </div>
-                      <div className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
-                        Replaced @{rep.previous_user?.username || 'someone'}
-                      </div>
+                      <span className="text-[15px] font-bold text-[var(--foreground)] leading-tight">
+                        {rep.new_user?.display_name || rep.new_user?.username || 'Anonymous'}
+                      </span>
+                      <span className="text-[13px] text-[var(--secondary)] font-medium">@{rep.new_user?.username || 'anon'}</span>
                     </div>
                   </div>
 
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto px-10 sm:px-0">
-                    <span className="text-lg font-bold text-[var(--foreground)]">
+                  <div className="flex-1 flex flex-col justify-center sm:px-4 w-full sm:w-auto pl-14 sm:pl-0 min-w-0">
+                    <span className="text-[14px] text-[var(--foreground)] font-medium truncate">
+                      replaced @{rep.previous_user?.username || 'someone'}
+                    </span>
+                    <span className="text-[12px] text-[var(--muted)] font-medium mt-0.5">
+                      {timeAgo(rep.created_at)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center sm:justify-end flex-shrink-0 pl-14 sm:pl-0">
+                    <span className="text-[16px] md:text-[18px] font-bold text-[var(--foreground)] tabular-nums">
                       ${Number(rep.amount_paid).toFixed(2)}
                     </span>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 font-medium mt-1">
-                      {rep.previous_holder_duration && (
-                        <span>Held {formatDuration(rep.previous_holder_duration)} · </span>
-                      )}
-                      <span>{timeAgo(rep.created_at)}</span>
-                    </div>
                   </div>
                 </div>
               ))}
 
               {recentReplacements.length === 0 && (
-                <div className="p-8 text-center text-gray-500 border border-dashed border-[var(--border-soft)] rounded-2xl">
-                  No replacements yet. Be the first!
+                <div className="flex flex-col items-center justify-center h-[180px] md:h-[200px] text-center bg-[var(--surface)] border border-[var(--border)] rounded-[16px] px-6">
+                  <h4 className="text-[16px] font-bold text-[var(--foreground)] mb-1">No replacements yet.</h4>
+                  <p className="text-[14px] text-[var(--secondary)] font-medium max-w-sm">
+                    The first person to replace #1 will appear here.
+                  </p>
+                  <p className="text-[13px] text-[var(--muted)] font-medium mt-3">History starts with the first replacement.</p>
                 </div>
               )}
             </div>
             
-            <div className="pt-4 flex justify-center">
-              <button onClick={() => router.push('/history')} className="text-sm font-semibold text-gray-500 hover:text-[var(--foreground)] transition-colors">
-                View full history →
-              </button>
-            </div>
+            {recentReplacements.length > 0 && (
+              <div className="pt-5 flex justify-center">
+                <button onClick={() => router.push('/history')} className="text-[14px] font-semibold text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors">
+                  View full history →
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* SIDEBAR: Stats & Activity */}
-          <div className="lg:col-span-1 space-y-8">
-            <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-[var(--accent)]" /> Platform Stats
-              </h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b border-[var(--border-soft)] pb-3">
-                  <span className="text-gray-500 text-sm font-medium">Current #1s</span>
-                  <span className="font-bold text-[var(--foreground)]">1</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-[var(--border-soft)] pb-3">
-                  <span className="text-gray-500 text-sm font-medium">Total Replacements</span>
-                  <span className="font-bold text-[var(--foreground)]">{replacementsCount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-[var(--border-soft)] pb-3">
-                  <span className="text-gray-500 text-sm font-medium">Highest Reign</span>
-                  <span className="font-bold text-[var(--foreground)]">4h 21m</span>
-                </div>
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-gray-500 text-sm font-medium">Total Spent</span>
-                  <span className="font-bold text-[var(--foreground)]">
-                    ${(replacementsCount > 0 ? (recentReplacements.reduce((acc, curr) => acc + Number(curr.amount_paid), 0) + 100) : 0).toFixed(0)}+
-                  </span>
-                </div>
+          {/* SIDEBAR: Live Activity */}
+          <div className="w-full lg:pt-1">
+            <h3 className="text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-6">Live Activity</h3>
+            
+            {recentReplacements.length > 0 ? (
+              <div className="space-y-4 border-l border-[var(--border)] pl-4">
+                {recentReplacements.slice(0, 6).map(rep => (
+                  <div key={rep.id} className="relative text-[13px] text-[var(--secondary)] font-medium leading-relaxed">
+                    <div className="absolute -left-[21px] top-2 w-2 h-2 rounded-full bg-[var(--border)]" />
+                    <p>
+                      <span className="font-semibold text-[var(--foreground)]">@{rep.new_user?.username}</span> replaced <span className="font-semibold text-[var(--foreground)]">@{rep.previous_user?.username}</span> for <span className="tabular-nums">${Number(rep.amount_paid).toFixed(0)}</span> <span className="text-[var(--muted)] block mt-0.5">{timeAgo(rep.created_at)}</span>
+                    </p>
+                  </div>
+                ))}
               </div>
-            </div>
-
-            <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6" id="how-it-works">
-              <h3 className="text-lg font-bold mb-4">How it works</h3>
-              <ol className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
-                <li className="flex gap-3">
-                  <span className="font-bold text-[var(--foreground)]">1.</span>
-                  <p>There is exactly one person in the #1 spot at all times.</p>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-[var(--foreground)]">2.</span>
-                  <p>Anyone can pay the current price to replace them instantly.</p>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-[var(--foreground)]">3.</span>
-                  <p>When replaced, the price increases by 20% and the battle begins.</p>
-                </li>
-              </ol>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-[var(--surface)] border border-[var(--border)] rounded-full mb-2 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
+                  <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-widest">Listening</span>
+                </div>
+                <h4 className="text-[15px] font-bold text-[var(--foreground)]">Waiting for the first battle.</h4>
+                <p className="text-[13px] text-[var(--secondary)] font-medium leading-relaxed">
+                  The next replacement will appear here in real time.
+                </p>
+              </div>
+            )}
           </div>
 
         </section>
 
+        {/* STATS STRIP */}
+        <section className="w-full max-w-5xl py-12 border-t border-[var(--border)] mt-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center md:text-left">
+            <div>
+              <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
+                {replacementsCount.toLocaleString()}
+              </div>
+              <div className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
+                Replacements
+              </div>
+            </div>
+            <div>
+              <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
+                ${(replacementsCount > 0 ? (recentReplacements.reduce((acc, curr) => acc + Number(curr.amount_paid), 0) + 100) : 0).toFixed(0)}
+              </div>
+              <div className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
+                Total Spent
+              </div>
+            </div>
+            <div>
+              <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
+                {isInitialState ? '0s' : '4h 21m'}
+              </div>
+              <div className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
+                Longest Reign
+              </div>
+            </div>
+            <div>
+              <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums flex justify-center md:justify-start items-center gap-2.5">
+                 <span className="h-2.5 w-2.5 rounded-full bg-[var(--success)] animate-pulse" />
+                 248
+              </div>
+              <div className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
+                Online Now
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
 
-      {/* Checkout Modal Dialog */}
       <CheckoutModal
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
@@ -439,7 +469,7 @@ export default function Home() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--background)]">
-        <div className="text-xl font-semibold animate-pulse text-[var(--foreground)]">Loading ReplaceMe...</div>
+        <div className="text-[15px] font-semibold animate-pulse text-[var(--secondary)]">Loading ReplaceMe...</div>
       </div>
     }>
       <HomeContent />
