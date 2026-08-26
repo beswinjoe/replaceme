@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-accent: var(--accent);
+  --color-accent-subtle: var(--accent-subtle);
+  
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Light mode defaults */
+:root {
+  --background: #faf9f6; /* Warm off-white */
+  --foreground: #1c1c1c; /* Dark neutral text */
+  --accent: #2563eb; /* A distinct brand accent color (blue) */
+  --accent-subtle: #eff6ff;
+  
+  /* Component backgrounds */
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --border-soft: #e5e7eb;
+}
+
+/* Dark mode overrides */
+[data-theme='dark'] {
+  --background: #121212; /* Deep charcoal */
+  --foreground: #f3f4f6; /* Light neutral text */
+  --accent: #3b82f6; 
+  --accent-subtle: #1e3a8a;
+  
+  /* Component backgrounds */
+  --surface: #18181b;
+  --surface-elevated: #27272a;
+  --border-soft: #3f3f46;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utility classes for surfaces */
+.surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+
+.surface-elevated {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] .surface-elevated {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+}
+
+/* Custom scrollbar - minimal */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-soft);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }

@@ -1,0 +1,128 @@
+import { NextResponse } from 'next/server'
+import DodoPayments from 'dodopayments'
+import { createAdminClient } from '@/utils/supabase/admin'
+
+export async function POST(req: Request) {
+  try {
+    const webhookSecret = process.env.DODO_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      console.warn('DODO_WEBHOOK_SECRET is not configured.')
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+    }
+
+    const webhookId = req.headers.get('webhook-id')
+    const webhookSignature = req.headers.get('webhook-signature')
+    const webhookTimestamp = req.headers.get('webhook-timestamp')
+
+    if (!webhookId || !webhookSignature || !webhookTimestamp) {
+      return NextResponse.json({ error: 'Missing webhook headers' }, { status: 400 })
+    }
+
+    const rawBody = await req.text()
+
+    // Initialize Dodo client with the secret key to verify signatures
+    const dodo = new DodoPayments({
+      bearerToken: process.env.DODO_PAYMENTS_API_KEY || '',
+      webhookKey: webhookSecret,
+      environment: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'test_mode' : 'live_mode',
+    })
+
+    // Verify signature using the SDK's unwrap helper
+    let payload: any
+    try {
+      payload = dodo.webhooks.unwrap(rawBody, {
+        headers: {
+          'webhook-id': webhookId,
+          'webhook-signature': webhookSignature,
+          'webhook-timestamp': webhookTimestamp,
+        },
+      })
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message)
+      return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 })
+    }
+
+    console.log('Received Dodo webhook event:', payload?.type)
+
+    if (payload?.type === 'payment.succeeded') {
+      const data = payload.data
+      if (!data) {
+        return NextResponse.json({ error: 'Missing payload data' }, { status: 400 })
+      }
+
+      // Metadata can be on the payment object or on the customer details
+      const metadata = data.metadata || data.customer?.metadata
+
+      if (!metadata || !metadata.user_id) {
+        console.error('Webhook payment.succeeded missing metadata or user_id')
+        return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
+      }
+
+      const userId = metadata.user_id
+      const amountPaid = Number(data.amount) / 100 // Convert cents back to dollars
+      const username = metadata.username
+      const displayName = metadata.display_name
+      const avatarUrl = metadata.avatar_url
+      const customMessage = metadata.custom_message
+      const websiteUrl = metadata.website_url
+
+      const supabaseAdmin = createAdminClient()
+
+      // 1. Update user profile details
+      if (username) {
+        const { error: userError } = await supabaseAdmin
+          .from('users')
+          .update({
+            username: username,
+            display_name: displayName || null,
+            avatar_url: avatarUrl || null,
+            website_url: websiteUrl || null
+          })
+          .eq('id', userId)
+
+        if (userError) {
+          console.error('Failed to update user profile in webhook:', userError)
+        }
+      }
+
+      // 2. Call the atomic database replacement transaction
+      const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
+        'replace_holder',
+        {
+          p_new_user_id: userId,
+          p_amount_paid: amountPaid,
+          p_custom_message: customMessage || null,
+          p_website_url: websiteUrl || null
+        }
+      )
+
+      if (replaceError) {
+        console.error('Atomic replacement failed in webhook:', replaceError)
+        return NextResponse.json({ error: 'Atomic replacement failed' }, { status: 500 })
+      }
+
+      // 3. Log payment success in payments table
+      const { error: paymentError } = await supabaseAdmin
+        .from('payments')
+        .insert({
+          user_id: userId,
+          dodo_payment_id: data.payment_id || data.transaction_id || data.session_id || 'unknown',
+          amount: amountPaid,
+          status: 'succeeded',
+          replacement_id: replaceData?.replacement_id || null,
+          metadata: metadata
+        })
+
+      if (paymentError) {
+        console.error('Failed to log payment in webhook:', paymentError)
+      }
+
+      console.log('Successfully replaced holder via webhook. New price:', replaceData?.new_price)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('Webhook error:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
+}
