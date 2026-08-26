@@ -94,8 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 3. Real-time Notification listener for the logged-in user
   useEffect(() => {
     if (!user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setNotification(null)
+            setNotification(null)
       return
     }
 

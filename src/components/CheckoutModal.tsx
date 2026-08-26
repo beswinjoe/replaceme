@@ -58,12 +58,9 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
       setActiveTab('auth')
       
       if (prefilledData) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setUsername(prefilledData.username)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCustomMessage(prefilledData.message)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setWebsiteUrl(prefilledData.link)
+                setUsername(prefilledData.username)
+                setCustomMessage(prefilledData.message)
+                setWebsiteUrl(prefilledData.link)
       }
     }
   }, [user, profile, isOpen, prefilledData, currentPrice])

@@ -18,8 +18,7 @@ export function ReplacedOverlay() {
 
   useEffect(() => {
     if (!notification || notification.type !== 'replaced' || !user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDetails(null)
+            setDetails(null)
       return
     }
 

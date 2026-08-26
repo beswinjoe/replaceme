@@ -5,8 +5,9 @@ import { Header } from '@/components/Header'
 import { CheckoutModal } from '@/components/CheckoutModal'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Clock } from 'lucide-react'
+import { Clock, Globe } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 // --- TYPES ---
 
@@ -23,8 +24,7 @@ interface HeroSectionProps {
 
 interface CurrentHolderCardProps {
   isInitialState: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  currentHolder: any
+    currentHolder: any
   holderUsername: string
   holderDisplayName: string
   holderAvatar: string
@@ -148,56 +148,78 @@ function HowItWorks() {
 }
 
 function CurrentHolderCard({ isInitialState, currentHolder, holderUsername, holderDisplayName, holderAvatar, holderMessage, reignTime, currentPrice, triggerCheckout }: CurrentHolderCardProps) {
+  
+  // Use user's uploaded avatar if available. If it's the initial seeded state, use the default hero avatar.
+  const uploadedAvatar = currentHolder?.user?.avatar_url
+  const showFallback = !isInitialState && !uploadedAvatar
+  const avatarUrl = isInitialState ? holderAvatar : uploadedAvatar
+
   return (
     <section className="w-full max-w-5xl mb-16 md:mb-20">
       <h3 className="text-[12px] md:text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 pl-1">CURRENT #1</h3>
       
-      <div className="w-full bg-[var(--surface-featured)] border border-[var(--border-featured)] rounded-[16px] p-5 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all min-h-[180px] shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+      <div className="w-full bg-[var(--surface-featured)] border border-[var(--border-featured)] rounded-[16px] p-5 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8 transition-all min-h-[180px] shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
         
-        {/* LEFT: Rank & User */}
-        <div className="flex items-center gap-4 w-full md:w-auto md:min-w-[240px] flex-shrink-0">
-          <span className="text-[20px] md:text-[24px] font-bold text-[var(--accent)] w-8 text-center">#1</span>
-          <img
-            src={holderAvatar}
-            alt={holderUsername}
-            className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover border border-[var(--border)] flex-shrink-0 bg-white"
-          />
-          <div className="flex flex-col">
-            <span className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] leading-tight tracking-tight line-clamp-1">
-              {holderDisplayName}
+        {/* LEFT: Rank & User Identity */}
+        <div className="flex items-center gap-4 w-full md:w-auto md:min-w-[260px] flex-shrink-0">
+          <span className="text-[20px] md:text-[24px] font-bold text-[var(--accent)] w-8 text-center shrink-0">#1</span>
+          
+          {showFallback ? (
+            <InitialsAvatar 
+              name={holderDisplayName || holderUsername || 'User'} 
+              className="w-16 h-16 md:w-[88px] md:h-[88px] border border-[var(--border)] text-[22px] md:text-[28px]" 
+            />
+          ) : (
+            <img
+              src={avatarUrl}
+              alt={holderUsername}
+              className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-full object-cover border border-[var(--border)] shrink-0 bg-[var(--surface)]"
+            />
+          )}
+
+          <div className="flex flex-col min-w-0">
+            {holderDisplayName && (
+              <span className="text-[22px] md:text-[26px] font-bold text-[var(--foreground)] leading-tight tracking-tight truncate max-w-[200px] md:max-w-[240px]">
+                {holderDisplayName}
+              </span>
+            )}
+            <span className="text-[14px] md:text-[15px] text-[var(--secondary)] font-medium mt-0.5 truncate max-w-[200px] md:max-w-[240px]">
+              @{holderUsername}
             </span>
-            <span className="text-[14px] md:text-[15px] text-[var(--secondary)] font-medium mt-0.5">@{holderUsername}</span>
           </div>
         </div>
         
         {/* MIDDLE: Claim & Meta */}
-        <div className="flex-1 flex flex-col justify-center w-full min-w-0 md:px-4">
-          <div className="text-[16px] md:text-[18px] text-[var(--foreground)] font-medium leading-snug">
-            &quot;{holderMessage}&quot;
-          </div>
-          <div className="flex flex-wrap items-center gap-3 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" /> Held #1 for {isInitialState ? '0s' : reignTime}
-            </span>
-            {!isInitialState && currentHolder?.website_url && (
-              <>
-                <span className="text-[var(--muted)]">•</span>
-                <a
-                  href={currentHolder.website_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[var(--foreground)] font-semibold hover:underline truncate max-w-[200px]"
-                >
-                  {currentHolder.website_url.replace(/^https?:\/\//, '')}
-                </a>
-              </>
+        <div className="flex-1 flex flex-col justify-center w-full min-w-0 md:px-4 py-2 md:py-0">
+          {holderMessage && (
+            <div className="text-[16px] md:text-[18px] text-[var(--foreground)] font-medium leading-snug line-clamp-3 md:line-clamp-2 break-words">
+              &quot;{holderMessage}&quot;
+            </div>
+          )}
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
+            {currentHolder?.website_url && !isInitialState && (
+              <a
+                href={currentHolder.website_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-[var(--accent)] font-semibold hover:opacity-80 transition-opacity truncate max-w-full sm:max-w-[200px]"
+              >
+                <Globe className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{currentHolder.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+              </a>
             )}
+            
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 shrink-0" /> 
+              Held #1 for {isInitialState ? '0s' : reignTime}
+            </span>
           </div>
         </div>
 
         {/* RIGHT: Price & CTA */}
-        <div className="flex flex-col items-start md:items-end flex-shrink-0 w-full md:w-[180px]">
-          <span className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mb-1">
+        <div className="flex flex-col items-start md:items-end flex-shrink-0 w-full md:w-[180px] pt-4 md:pt-0 border-t md:border-t-0 border-[var(--border)]">
+          <span className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mb-1 pt-2 md:pt-0">
             CURRENT PRICE
           </span>
           <span className="text-[36px] md:text-[42px] font-bold text-[var(--foreground)] tabular-nums tracking-tight leading-none mb-4 md:mb-5">
@@ -205,7 +227,7 @@ function CurrentHolderCard({ isInitialState, currentHolder, holderUsername, hold
           </span>
           <button 
             onClick={triggerCheckout}
-            className="w-full bg-[var(--accent)] text-white px-5 py-3 md:py-3 rounded-[12px] font-bold text-[15px] hover:opacity-90 transition-all active:scale-[0.98] uppercase"
+            className="w-full bg-[var(--accent)] text-white px-5 py-3 rounded-[12px] font-bold text-[15px] hover:opacity-90 transition-all active:scale-[0.98] uppercase"
           >
             REPLACE #1
           </button>
@@ -215,7 +237,6 @@ function CurrentHolderCard({ isInitialState, currentHolder, holderUsername, hold
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[var(--surface)] border border-[var(--border)] rounded-[16px] hover:border-[var(--muted)] transition-colors gap-4">
@@ -223,11 +244,18 @@ function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
         <span className="text-[14px] md:text-[15px] font-bold text-[var(--muted)] w-8 text-center tabular-nums">
           #{idx + 2}
         </span>
-        <img 
-          src={rep.new_user?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'}
-          alt={rep.new_user?.username || 'user'}
-          className="w-10 h-10 rounded-full border border-[var(--border)] object-cover bg-white"
-        />
+        {rep.new_user?.avatar_url ? (
+          <img 
+            src={rep.new_user.avatar_url}
+            alt={rep.new_user.username}
+            className="w-10 h-10 rounded-full border border-[var(--border)] object-cover bg-white shrink-0"
+          />
+        ) : (
+          <InitialsAvatar 
+            name={rep.new_user?.display_name || rep.new_user?.username || 'User'} 
+            className="w-10 h-10 border border-[var(--border)] text-[14px] shrink-0"
+          />
+        )}
         <div className="flex flex-col">
           <span className="text-[15px] font-bold text-[var(--foreground)] leading-tight">
             {rep.new_user?.display_name || rep.new_user?.username || 'Anonymous'}
@@ -332,13 +360,11 @@ function HomeContent() {
   const { profile } = useAuth()
 
   // State
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [currentHolder, setCurrentHolder] = useState<any>(null)
+    const [currentHolder, setCurrentHolder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [replacementsCount, setReplacementsCount] = useState(0)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [recentReplacements, setRecentReplacements] = useState<any[]>([])
+    const [recentReplacements, setRecentReplacements] = useState<any[]>([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [reignTime, setReignTime] = useState('0s')
   
@@ -368,7 +394,7 @@ function HomeContent() {
           id: '00000000-0000-0000-0000-000000000000',
           username: 'replaceme',
           display_name: 'ReplaceMe System',
-          avatar_url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=replaceme'
+          avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60'
         }
       })
       setReplacementsCount(0)
@@ -444,7 +470,7 @@ function HomeContent() {
           id: '00000000-0000-0000-0000-000000000000',
           username: 'replaceme',
           display_name: 'ReplaceMe System',
-          avatar_url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=replaceme'
+          avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60'
         }
       })
       setReplacementsCount(0)
@@ -458,8 +484,7 @@ function HomeContent() {
   }, [supabase])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchGameState()
+        fetchGameState()
 
     const holderChannel = supabase
       .channel('current-holder-changes')
