@@ -8,56 +8,22 @@ export async function GET(
   const { replacementId } = await params
   const supabase = createAdminClient()
 
-  let targetUrl = ''
-  let websiteUrlId = ''
-  let isActiveReign = false
-  let dbReplacementId: string | null = replacementId
-
-  // Genesis reign comes in as 'genesis' string
-  if (replacementId === 'genesis') {
-    dbReplacementId = null
-    isActiveReign = true
-    
-    // Fetch genesis URL directly from current_holder
-    const { data: current } = await supabase
-      .from('current_holder')
-      .select('website_url, active_reign_id')
-      .single()
-      
-    if (current && current.active_reign_id === null) {
-      targetUrl = current.website_url
-      websiteUrlId = current.website_url
-    }
-  } else {
-    // Normal reign with a UUID
-    // First, check if this is the ACTIVE reign
-    const { data: current } = await supabase
-      .from('current_holder')
-      .select('website_url, active_reign_id')
-      .single()
-
-    if (current && current.active_reign_id === replacementId) {
-      isActiveReign = true
-      targetUrl = current.website_url
-      websiteUrlId = current.website_url
-    } else {
-      // Historical reign
-      const { data: replacement } = await supabase
-        .from('replacements')
-        .select('new_website_url')
-        .eq('id', replacementId)
-        .single()
-      
-      if (replacement) {
-        targetUrl = replacement.new_website_url
-        websiteUrlId = replacement.new_website_url
-      }
-    }
-  }
-
-  if (!targetUrl) {
+  if (!replacementId || replacementId.length !== 36) {
     return NextResponse.redirect(new URL('/', request.url))
   }
+
+  // Find the target URL from the exact reign
+  const { data: replacement } = await supabase
+    .from('replacements')
+    .select('new_website_url')
+    .eq('id', replacementId)
+    .single()
+    
+  if (!replacement || !replacement.new_website_url) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  let targetUrl = replacement.new_website_url
 
   // Ensure protocol
   if (!targetUrl.startsWith('http')) {
@@ -73,25 +39,21 @@ export async function GET(
   }
 
   // Record click
-  if (clientId && websiteUrlId) {
+  if (clientId) {
     const { error } = await supabase
       .from('reign_events')
       .insert({
-        website_url: websiteUrlId,
-        replacement_id: dbReplacementId,
+        website_url: replacement.new_website_url,
+        replacement_id: replacementId,
         event_type: 'click',
         client_id: clientId,
       })
 
-    if (!error || error.code !== '23505') {
-      // If active reign, we increment current_holder. If historical, we increment replacements.
-      // We'll update the RPC logic slightly by handling it in JS for exactness without schema churn,
-      // or we can use an RPC. Since we have Admin Client, we can just update directly.
-      if (isActiveReign) {
-        await supabase.rpc('increment_click', { p_replacement_id: '00000000-0000-0000-0000-000000000000' })
-      } else if (dbReplacementId) {
-        await supabase.rpc('increment_click', { p_replacement_id: dbReplacementId })
-      }
+    // If it's not a duplicate, increment the count
+    if (!error) {
+      await supabase.rpc('increment_click', { p_replacement_id: replacementId })
+    } else if (error.code !== '23505') {
+      console.error('Click tracking error:', error)
     }
   }
 

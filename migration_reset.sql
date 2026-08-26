@@ -21,8 +21,6 @@ CREATE TABLE public.current_holder (
   website_name text not null default 'ReplaceMe',
   website_logo text not null default '/replaceme-avatar.svg',
   logo_source text default 'fallback' not null,
-  views_count integer default 0 not null,
-  clicks_count integer default 0 not null,
   active_reign_id uuid,
   constraint sole_row check (id = '00000000-0000-0000-0000-000000000000'::uuid)
 );
@@ -114,19 +112,37 @@ ALTER TABLE public.live_presence ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to live_presence" on public.live_presence for select using (true);
 
 -- 4. INSERT BASE DATA
-INSERT INTO public.current_holder (id, current_price, replaced_at, custom_message, website_url, website_name, website_logo, logo_source, views_count, clicks_count)
-VALUES (
-  '00000000-0000-0000-0000-000000000000',
-  1.00,
-  now(),
-  'Someone has to be first. Replace me to start the game.',
-  'replaceme.lol',
-  'ReplaceMe',
-  '/replaceme-avatar.svg',
-  'fallback',
-  0,
-  0
-) ON CONFLICT DO NOTHING;
+DO $$
+DECLARE
+  v_genesis_reign_id uuid;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.replacements WHERE previous_website_url = 'genesis') THEN
+    INSERT INTO public.replacements (
+      previous_website_url, previous_website_name, previous_website_logo,
+      new_website_url, new_website_name, new_website_logo,
+      amount_paid, price_before, price_after, previous_holder_duration,
+      views_count, clicks_count, custom_message, logo_source
+    ) VALUES (
+      'genesis', 'Genesis', '',
+      'replaceme.lol', 'ReplaceMe', '/replaceme-avatar.svg',
+      0.00, 0.00, 1.00, 0,
+      0, 0, 'Someone has to be first. Replace me to start the game.', 'fallback'
+    ) RETURNING id INTO v_genesis_reign_id;
+
+    INSERT INTO public.current_holder (id, current_price, replaced_at, custom_message, website_url, website_name, website_logo, logo_source, active_reign_id)
+    VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      1.00,
+      now(),
+      'Someone has to be first. Replace me to start the game.',
+      'replaceme.lol',
+      'ReplaceMe',
+      '/replaceme-avatar.svg',
+      'fallback',
+      v_genesis_reign_id
+    ) ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
 
 INSERT INTO public.achievements (id, name, description, icon, color) VALUES
   ('first_blood', 'First Blood', 'Became #1 for the very first time.', '🩸', 'red'),

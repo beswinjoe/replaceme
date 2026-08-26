@@ -413,7 +413,24 @@ function HomeContent() {
         .maybeSingle()
 
       if (holderError) throw holderError
-      setCurrentHolder(holder)
+
+      let viewsCount = 0
+      let clicksCount = 0
+
+      if (holder?.active_reign_id) {
+        const { data: reignData, error: reignError } = await supabase
+          .from('replacements')
+          .select('views_count, clicks_count')
+          .eq('id', holder.active_reign_id)
+          .single()
+
+        if (!reignError && reignData) {
+          viewsCount = reignData.views_count
+          clicksCount = reignData.clicks_count
+        }
+      }
+
+      setCurrentHolder({ ...holder, views_count: viewsCount, clicks_count: clicksCount })
 
       const { count, error: countError } = await supabase
         .from('replacements')

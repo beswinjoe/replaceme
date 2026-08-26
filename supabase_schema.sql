@@ -13,8 +13,6 @@ create table if not exists public.current_holder (
   website_name text not null default 'ReplaceMe',
   website_logo text not null default '/replaceme-avatar.svg',
   logo_source text default 'fallback' not null,
-  views_count integer default 0 not null,
-  clicks_count integer default 0 not null,
   created_at timestamptz default now() not null,
   active_reign_id uuid references public.replacements(id),
   -- Ensure only a single row can ever exist in this table
@@ -152,20 +150,40 @@ create policy "Allow public update to live_presence" on public.live_presence for
 
 
 -- 8. SEED DATA SETUP
--- Seed the initial holder row
-insert into public.current_holder (id, current_price, custom_message, website_url, website_name, website_logo, replaced_at, views_count, clicks_count, logo_source)
-values (
-  '00000000-0000-0000-0000-000000000000',
-  1.00,
-  'Someone has to be first. Replace me to start the game.',
-  'replaceme.lol',
-  'ReplaceMe',
-  '/replaceme-avatar.svg',
-  now(),
-  0,
-  0,
-  'fallback'
-) on conflict (id) do nothing;
+-- Insert genesis row into replacements
+DO $$
+DECLARE
+  v_genesis_reign_id uuid;
+BEGIN
+  -- We don't want to duplicate if it already exists, so we'll just check
+  IF NOT EXISTS (SELECT 1 FROM public.replacements WHERE previous_website_url = 'genesis') THEN
+    INSERT INTO public.replacements (
+      previous_website_url, previous_website_name, previous_website_logo,
+      new_website_url, new_website_name, new_website_logo,
+      amount_paid, price_before, price_after, previous_holder_duration,
+      views_count, clicks_count, custom_message, logo_source
+    ) VALUES (
+      'genesis', 'Genesis', '',
+      'replaceme.lol', 'ReplaceMe', '/replaceme-avatar.svg',
+      0.00, 0.00, 1.00, 0,
+      0, 0, 'Someone has to be first. Replace me to start the game.', 'fallback'
+    ) RETURNING id INTO v_genesis_reign_id;
+
+    -- Seed the initial holder row pointing to genesis
+    insert into public.current_holder (id, current_price, custom_message, website_url, website_name, website_logo, replaced_at, logo_source, active_reign_id)
+    values (
+      '00000000-0000-0000-0000-000000000000',
+      1.00,
+      'Someone has to be first. Replace me to start the game.',
+      'replaceme.lol',
+      'ReplaceMe',
+      '/replaceme-avatar.svg',
+      now(),
+      'fallback',
+      v_genesis_reign_id
+    ) on conflict (id) do nothing;
+  END IF;
+END $$;
 
 -- Seed Achievements
 insert into public.achievements (id, name, description, icon) values
@@ -182,21 +200,13 @@ on conflict (id) do nothing;
 -- 9. ANALYTICS INCREMENT RPCs
 create or replace function public.increment_view(p_replacement_id uuid) returns void as $$
 begin
-  if p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid then
-    update public.current_holder set views_count = views_count + 1 where id = p_replacement_id;
-  else
-    update public.replacements set views_count = views_count + 1 where id = p_replacement_id;
-  end if;
+  update public.replacements set views_count = views_count + 1 where id = p_replacement_id;
 end;
 $$ language plpgsql security definer;
 
 create or replace function public.increment_click(p_replacement_id uuid) returns void as $$
 begin
-  if p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid then
-    update public.current_holder set clicks_count = clicks_count + 1 where id = p_replacement_id;
-  else
-    update public.replacements set clicks_count = clicks_count + 1 where id = p_replacement_id;
-  end if;
+  update public.replacements set clicks_count = clicks_count + 1 where id = p_replacement_id;
 end;
 $$ language plpgsql security definer;
 
@@ -232,8 +242,8 @@ begin
   end if;
 
   -- 2. Lock current_holder for update to prevent concurrent updates
-  select website_url, website_name, website_logo, current_price, replaced_at, views_count, clicks_count
-  into v_prev_website_url, v_prev_website_name, v_prev_website_logo, v_current_price, v_replaced_at, v_views_count, v_clicks_count
+  select website_url, website_name, website_logo, current_price, replaced_at
+  into v_prev_website_url, v_prev_website_name, v_prev_website_logo, v_current_price, v_replaced_at
   from public.current_holder
   where id = '00000000-0000-0000-0000-000000000000'::uuid
   for update;
@@ -291,8 +301,8 @@ begin
     v_current_price,
     v_new_price,
     v_duration,
-    coalesce(v_views_count, 0),
-    coalesce(v_clicks_count, 0),
+    0,
+    0,
     p_custom_message,
     now(),
     p_logo_source
@@ -306,8 +316,6 @@ begin
       current_price = v_new_price,
       replaced_at = now(),
       custom_message = p_custom_message,
-      views_count = 0,
-      clicks_count = 0,
       logo_source = p_logo_source,
       active_reign_id = v_replacement_id
   where id = '00000000-0000-0000-0000-000000000000'::uuid;

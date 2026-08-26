@@ -14,63 +14,34 @@ export async function POST(
       return NextResponse.json({ error: 'Missing clientId' }, { status: 400 })
     }
 
-    let websiteUrlId = ''
-    let isActiveReign = false
-    let dbReplacementId: string | null = replacementId
-
-    if (replacementId === 'genesis') {
-      dbReplacementId = null
-      isActiveReign = true
-      
-      const { data: current } = await supabase
-        .from('current_holder')
-        .select('website_url, active_reign_id')
-        .single()
-        
-      if (current && current.active_reign_id === null) {
-        websiteUrlId = current.website_url
-      }
-    } else {
-      const { data: current } = await supabase
-        .from('current_holder')
-        .select('website_url, active_reign_id')
-        .single()
-
-      if (current && current.active_reign_id === replacementId) {
-        isActiveReign = true
-        websiteUrlId = current.website_url
-      } else {
-        const { data: replacement } = await supabase
-          .from('replacements')
-          .select('new_website_url')
-          .eq('id', replacementId)
-          .single()
-        
-        if (replacement) {
-          websiteUrlId = replacement.new_website_url
-        }
-      }
+    if (!replacementId || replacementId.length !== 36) {
+      return NextResponse.json({ error: 'Invalid reign' }, { status: 400 })
     }
 
-    if (!websiteUrlId) {
+    // Grab the exact reign to ensure it exists and to get its URL
+    const { data: replacement } = await supabase
+      .from('replacements')
+      .select('new_website_url')
+      .eq('id', replacementId)
+      .single()
+      
+    if (!replacement || !replacement.new_website_url) {
       return NextResponse.json({ error: 'Reign not found' }, { status: 404 })
     }
 
     const { error } = await supabase
       .from('reign_events')
       .insert({
-        website_url: websiteUrlId,
-        replacement_id: dbReplacementId,
+        website_url: replacement.new_website_url,
+        replacement_id: replacementId,
         event_type: 'view',
         client_id: clientId,
       })
 
-    if (!error || error.code !== '23505') {
-      if (isActiveReign) {
-        await supabase.rpc('increment_view', { p_replacement_id: '00000000-0000-0000-0000-000000000000' })
-      } else if (dbReplacementId) {
-        await supabase.rpc('increment_view', { p_replacement_id: dbReplacementId })
-      }
+    if (!error) {
+      await supabase.rpc('increment_view', { p_replacement_id: replacementId })
+    } else if (error.code !== '23505') {
+      console.error('View tracking insert error:', error)
     }
 
     return NextResponse.json({ success: true })
