@@ -1,202 +1,71 @@
--- Supabase Schema for ReplaceMe application
+-- 1. ADD NEW COLUMNS TO EXISTING TABLES
+ALTER TABLE public.current_holder
+ADD COLUMN IF NOT EXISTS views_count integer default 0 not null,
+ADD COLUMN IF NOT EXISTS clicks_count integer default 0 not null;
 
--- Enable uuid-ossp extension
-create extension if not exists "uuid-ossp";
-
--- 1. CURRENT HOLDER TABLE (exactly one row holds the active #1)
-create table if not exists public.current_holder (
-  id uuid primary key default '00000000-0000-0000-0000-000000000000'::uuid,
-  current_price numeric(12, 2) not null check (current_price >= 0),
-  replaced_at timestamptz default now() not null,
-  custom_message text,
-  website_url text not null,
-  website_name text not null,
-  website_logo text not null,
-  views_count integer default 0 not null,
-  clicks_count integer default 0 not null,
-  created_at timestamptz default now() not null,
-  -- Ensure only a single row can ever exist in this table
-  constraint sole_row check (id = '00000000-0000-0000-0000-000000000000'::uuid)
-);
-
--- Enable RLS for current_holder
-alter table public.current_holder enable row level security;
-
--- Policies for current_holder
-create policy "Allow public read access to current holder"
-  on public.current_holder for select
-  using (true);
-
--- 2. REPLACEMENTS TABLE (history of all replacements)
-create table if not exists public.replacements (
-  id uuid primary key default gen_random_uuid(),
-  previous_website_url text,
-  previous_website_name text,
-  previous_website_logo text,
-  new_website_url text not null,
-  new_website_name text not null,
-  new_website_logo text not null,
-  amount_paid numeric(12, 2) not null,
-  price_before numeric(12, 2) not null,
-  price_after numeric(12, 2) not null,
-  previous_holder_duration numeric, -- in seconds
-  views_count integer default 0 not null,
-  clicks_count integer default 0 not null,
-  custom_message text,
-  created_at timestamptz default now() not null
-);
-
--- Enable RLS for replacements
-alter table public.replacements enable row level security;
-
--- Policies for replacements
-create policy "Allow public read access to replacements history"
-  on public.replacements for select
-  using (true);
+ALTER TABLE public.replacements
+ADD COLUMN IF NOT EXISTS views_count integer default 0 not null,
+ADD COLUMN IF NOT EXISTS clicks_count integer default 0 not null;
 
 
--- 3. PAYMENTS TABLE (Dodo Payments transactions tracking)
-create table if not exists public.payments (
+-- 2. REIGN EVENTS TABLE
+CREATE TABLE IF NOT EXISTS public.reign_events (
   id uuid primary key default gen_random_uuid(),
   website_url text not null,
-  dodo_payment_id text unique not null,
-  amount numeric(12, 2) not null,
-  status text not null,
-  replacement_id uuid references public.replacements(id),
-  metadata jsonb,
-  created_at timestamptz default now() not null
-);
-
--- Safely apply status constraint for migrations
-alter table public.payments drop constraint if exists payments_status_check;
-alter table public.payments add constraint payments_status_check check (status in ('pending', 'processing', 'succeeded', 'failed', 'refund_pending', 'refunded', 'refund_failed'));
-
--- Enable RLS for payments
-alter table public.payments enable row level security;
-
--- Policies for payments
-create policy "Allow users to view their own payments"
-  on public.payments for select
-  using (true); -- No longer locked to auth
-
-
--- 4. ACHIEVEMENTS TABLE
-create table if not exists public.achievements (
-  id text primary key,
-  name text not null,
-  description text not null,
-  icon text not null
-);
-
--- Enable RLS for achievements
-alter table public.achievements enable row level security;
-
--- Policies for achievements
-create policy "Allow public read access to achievements"
-  on public.achievements for select
-  using (true);
-
-
--- 5. WEBSITE ACHIEVEMENTS TABLE
-create table if not exists public.website_achievements (
-  website_url text not null,
-  achievement_id text references public.achievements(id) on delete cascade not null,
-  earned_at timestamptz default now() not null,
-  primary key (website_url, achievement_id)
-);
-
--- Enable RLS for website_achievements
-alter table public.website_achievements enable row level security;
-
--- Policies for website_achievements
-create policy "Allow public read access to earned achievements"
-  on public.website_achievements for select
-  using (true);
-
-
--- 6. REIGN EVENTS TABLE (Tracking views and clicks per reign)
-create table if not exists public.reign_events (
-  id uuid primary key default gen_random_uuid(),
-  website_url text not null,
-  replacement_id uuid, -- null if it's the genesis '00000000...' holder
+  replacement_id uuid,
   event_type text not null check (event_type in ('view', 'click')),
   client_id text not null,
   created_at timestamptz default now() not null,
   constraint unique_event_per_client unique (replacement_id, client_id, event_type)
 );
 
-create index idx_reign_events_website_type on public.reign_events(website_url, event_type);
-create index idx_reign_events_replacement_id on public.reign_events(replacement_id);
+CREATE INDEX IF NOT EXISTS idx_reign_events_website_type on public.reign_events(website_url, event_type);
+CREATE INDEX IF NOT EXISTS idx_reign_events_replacement_id on public.reign_events(replacement_id);
 
-alter table public.reign_events enable row level security;
-create policy "Allow public read access to reign_events" on public.reign_events for select using (true);
+ALTER TABLE public.reign_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access to reign_events" ON public.reign_events;
+CREATE POLICY "Allow public read access to reign_events" on public.reign_events for select using (true);
 
 
--- 7. LIVE PRESENCE TABLE
-create table if not exists public.live_presence (
+-- 3. LIVE PRESENCE TABLE
+CREATE TABLE IF NOT EXISTS public.live_presence (
   website_url text not null,
   client_id text not null,
   last_seen_at timestamptz default now() not null,
   primary key (website_url, client_id)
 );
 
-create index idx_live_presence_website_time on public.live_presence(website_url, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_live_presence_website_time on public.live_presence(website_url, last_seen_at);
 
-alter table public.live_presence enable row level security;
-create policy "Allow public read access to live_presence" on public.live_presence for select using (true);
-
-
--- 8. SEED DATA SETUP
--- Seed the initial holder row
-insert into public.current_holder (id, current_price, custom_message, website_url, website_name, website_logo, replaced_at, views_count, clicks_count)
-values (
-  '00000000-0000-0000-0000-000000000000'::uuid,
-  1.00,
-  'Someone has to be first. Replace me!',
-  'replaceme.lol',
-  'ReplaceMe',
-  '/replaceme-avatar.svg',
-  now(),
-  0,
-  0
-) on conflict (id) do nothing;
-
--- Seed Achievements
-insert into public.achievements (id, name, description, icon) values
-  ('first_blood', 'FIRST BLOOD', 'Become #1 for the first time.', '👶'),
-  ('revenge', 'REVENGE', 'Replace the person who replaced you.', '🔁'),
-  ('untouchable', 'UNTOUCHABLE', 'Hold #1 for 24 hours.', '👑'),
-  ('serial_replacer', 'SERIAL REPLACER', 'Replace 10 websites.', '💀'),
-  ('unemployed', 'UNEMPLOYED', 'Get replaced 10 times.', '😭'),
-  ('big_spender', 'BIG SPENDER', 'Spend over $100 total.', '💸'),
-  ('internet_menace', 'INTERNET MENACE', 'Replace the same website multiple times in a public battle.', '🔥')
-on conflict (id) do nothing;
+ALTER TABLE public.live_presence ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access to live_presence" ON public.live_presence;
+CREATE POLICY "Allow public read access to live_presence" on public.live_presence for select using (true);
 
 
--- 9. ANALYTICS INCREMENT RPCs
-create or replace function public.increment_view(p_replacement_id uuid) returns void as $$
-begin
-  if p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid then
-    update public.current_holder set views_count = views_count + 1 where id = p_replacement_id;
-  else
-    update public.replacements set views_count = views_count + 1 where id = p_replacement_id;
-  end if;
-end;
-$$ language plpgsql security definer;
+-- 4. ANALYTICS INCREMENT RPCs
+CREATE OR REPLACE FUNCTION public.increment_view(p_replacement_id uuid) RETURNS void AS $$
+BEGIN
+  IF p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid THEN
+    UPDATE public.current_holder SET views_count = views_count + 1 WHERE id = p_replacement_id;
+  ELSE
+    UPDATE public.replacements SET views_count = views_count + 1 WHERE id = p_replacement_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-create or replace function public.increment_click(p_replacement_id uuid) returns void as $$
-begin
-  if p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid then
-    update public.current_holder set clicks_count = clicks_count + 1 where id = p_replacement_id;
-  else
-    update public.replacements set clicks_count = clicks_count + 1 where id = p_replacement_id;
-  end if;
-end;
-$$ language plpgsql security definer;
+CREATE OR REPLACE FUNCTION public.increment_click(p_replacement_id uuid) RETURNS void AS $$
+BEGIN
+  IF p_replacement_id = '00000000-0000-0000-0000-000000000000'::uuid THEN
+    UPDATE public.current_holder SET clicks_count = clicks_count + 1 WHERE id = p_replacement_id;
+  ELSE
+    UPDATE public.replacements SET clicks_count = clicks_count + 1 WHERE id = p_replacement_id;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 10. ATOMIC REPLACEMENT AND PAYMENT PROCESSING
-create or replace function public.process_payment_and_replace(
+-- 5. UPDATE EXISTING REPLACEMENT FUNCTION TO HANDLE COUNTS
+CREATE OR REPLACE FUNCTION public.process_payment_and_replace(
   p_payment_id text,
   p_new_website_url text,
   p_new_website_name text,
@@ -204,7 +73,7 @@ create or replace function public.process_payment_and_replace(
   p_amount_paid numeric,
   p_custom_message text,
   p_metadata jsonb
-) returns json as $$
+) RETURNS json AS $$
 declare
   v_prev_website_url text;
   v_prev_website_name text;
@@ -394,4 +263,4 @@ exception
     -- A concurrent webhook successfully inserted this payment already
     return json_build_object('status', 'already_processed');
 end;
-$$ language plpgsql security definer;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

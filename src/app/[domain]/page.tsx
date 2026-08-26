@@ -37,7 +37,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   // 2. Fetch past reign stats from replacements
   const { data: replacements } = await supabase
     .from('replacements')
-    .select('previous_holder_duration, previous_website_url, previous_website_name, previous_website_logo, new_website_url, new_website_name, new_website_logo')
+    .select('previous_holder_duration, previous_website_url, previous_website_name, previous_website_logo, new_website_url, new_website_name, new_website_logo, views_count, clicks_count')
     .or(`previous_website_url.eq.${domain},new_website_url.eq.${domain}`)
 
   if (!isCurrentlyNumberOne && (!replacements || replacements.length === 0)) {
@@ -71,6 +71,35 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
       }
     }
   }
+
+  // Calculate totals
+  let totalViews = pastReigns.reduce((acc, r) => acc + (r.views_count || 0), 0)
+  let totalClicks = pastReigns.reduce((acc, r) => acc + (r.clicks_count || 0), 0)
+  
+  if (isCurrentlyNumberOne) {
+    totalViews += currentHolder.views_count || 0
+    totalClicks += currentHolder.clicks_count || 0
+  }
+
+  // Calculate today
+  const startOfDay = new Date()
+  startOfDay.setUTCHours(0, 0, 0, 0)
+
+  const { count: viewsToday } = await supabase
+    .from('reign_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('website_url', domain)
+    .eq('event_type', 'view')
+    .gte('created_at', startOfDay.toISOString())
+
+  // Calculate live presence
+  // eslint-disable-next-line react-hooks/purity
+  const fortyFiveSecondsAgo = new Date(Date.now() - 45 * 1000).toISOString()
+  const { count: liveNow } = await supabase
+    .from('live_presence')
+    .select('*', { count: 'exact', head: true })
+    .eq('website_url', domain)
+    .gte('last_seen_at', fortyFiveSecondsAgo)
 
   return (
     <>
@@ -113,6 +142,35 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
           <Globe className="w-4 h-4" />
           Visit Website
         </a>
+
+        {/* STATS STRIP */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 mt-10 w-full max-w-3xl">
+          <div className="bg-[var(--surface-elevated)] p-4 rounded-2xl border border-[var(--border-soft)]">
+            <p className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] tabular-nums leading-none mb-1">
+              {totalViews.toLocaleString()}
+            </p>
+            <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Total Views</p>
+          </div>
+          <div className="bg-[var(--surface-elevated)] p-4 rounded-2xl border border-[var(--border-soft)]">
+            <p className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] tabular-nums leading-none mb-1">
+              {viewsToday || 0}
+            </p>
+            <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Today</p>
+          </div>
+          <div className="bg-[var(--surface-elevated)] p-4 rounded-2xl border border-[var(--border-soft)]">
+            <p className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] tabular-nums leading-none mb-1">
+              <span className="text-[var(--success)] inline-block animate-pulse h-2 w-2 rounded-full mr-1.5 mb-1" />
+              {liveNow || 0}
+            </p>
+            <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Live Now</p>
+          </div>
+          <div className="bg-[var(--surface-elevated)] p-4 rounded-2xl border border-[var(--border-soft)]">
+            <p className="text-[24px] md:text-[28px] font-bold text-[var(--foreground)] tabular-nums leading-none mb-1">
+              {totalClicks.toLocaleString()}
+            </p>
+            <p className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Total Clicks</p>
+          </div>
+        </div>
 
         {/* REIGN INFO */}
         <div className="mt-12 w-full pt-10 border-t border-[var(--border-soft)]">

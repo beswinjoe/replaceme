@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const dodo = new DodoPayments({
       bearerToken: process.env.DODO_PAYMENTS_API_KEY || '',
       webhookKey: webhookSecret,
-      environment: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'test_mode' : 'live_mode',
+      environment: (process.env.DODO_ENVIRONMENT as any) || (process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'test_mode' : 'live_mode'),
     })
 
     // Verify signature using the SDK's unwrap helper

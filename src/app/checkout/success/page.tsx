@@ -96,25 +96,55 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
     const amountNum = Number(paymentRecord.amount)
     const amountPaid = Number.isFinite(amountNum) ? `$${amountNum.toFixed(2)}` : '—'
     
+    // Fetch replacement details
+    const { data: replacement } = await supabase
+      .from('replacements')
+      .select('new_website_name, custom_message')
+      .eq('id', paymentRecord.replacement_id)
+      .single()
+
+    const websiteName = replacement?.new_website_name || 'Your Website'
+    const customMessage = replacement?.custom_message || ''
+
+    const shareText = encodeURIComponent(`I'm #1 on ReplaceMe 👑\n\n${websiteName} is getting attention right now.\n\nreplaceme.lol`)
+    const shareUrl = `https://twitter.com/intent/tweet?text=${shareText}`
+
     return (
       <div className="text-center animate-in zoom-in-95 duration-300">
         <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-yellow-200 dark:border-yellow-700/50">
           👑
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-          You&apos;re #1.
+        <h1 className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-[0.1em] mb-2">
+          YOU&apos;RE #1
         </h1>
-        <p className="text-lg text-[var(--secondary)] font-medium mb-8">
-          Your reign has officially started.
-        </p>
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
+          {websiteName}
+        </h2>
+        {customMessage && (
+          <p className="text-lg text-[var(--foreground)] font-medium mb-6 italic">
+            &quot;{customMessage}&quot;
+          </p>
+        )}
 
-        <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6 mb-8 text-center space-y-2 max-w-sm mx-auto">
-           <p className="text-sm font-medium text-[var(--muted)] uppercase tracking-wide">You paid</p>
-           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">{amountPaid}</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mb-8 text-[14px] md:text-[15px] font-bold text-[var(--secondary)]">
+          <span className="text-[var(--accent)]">{amountPaid} paid</span>
+          <span className="hidden sm:block text-[var(--border)]">•</span>
+          <span>👁 0 views</span>
+          <span className="hidden sm:block text-[var(--border)]">•</span>
+          <span>🔥 0 clicks</span>
         </div>
 
-        <div className="space-y-6">
-          <Link href="/" className="inline-flex items-center gap-2 text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors">
+        <div className="space-y-4 max-w-sm mx-auto">
+          <a 
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full bg-[var(--foreground)] text-[var(--background)] px-6 py-3.5 rounded-[12px] font-bold text-[15px] hover:opacity-90 transition-opacity shadow-md"
+          >
+            <Share className="w-4 h-4" /> Share your reign
+          </a>
+          
+          <Link href="/" className="inline-flex items-center justify-center gap-2 w-full text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors py-2">
             <ArrowLeft className="w-4 h-4" /> Return to homepage
           </Link>
         </div>

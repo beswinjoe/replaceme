@@ -6,6 +6,7 @@ import { CheckoutModal } from '@/components/CheckoutModal'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Clock, Globe } from 'lucide-react'
+import { getClientId } from '@/utils/analytics'
 
 // --- TYPES ---
 
@@ -16,6 +17,7 @@ interface HeroSectionProps {
   quickMessage: string
   setQuickMessage: (val: string) => void
   triggerCheckout: (e?: FormEvent) => void
+  quickError: string
 }
 
 interface CurrentHolderCardProps {
@@ -27,6 +29,9 @@ interface CurrentHolderCardProps {
   reignTime: string
   currentPrice: number
   triggerCheckout: (e?: FormEvent) => void
+  viewsCount: number
+  clicksCount: number
+  liveViewers: number
 }
 
 interface StatsStripProps {
@@ -62,7 +67,7 @@ const timeAgo = (dateStr: string) => {
 
 // --- SUB-COMPONENTS ---
 
-function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickMessage, setQuickMessage, triggerCheckout }: HeroSectionProps) {
+function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickMessage, setQuickMessage, triggerCheckout, quickError }: HeroSectionProps) {
   return (
     <section className="text-center w-full max-w-3xl flex flex-col items-center mb-16 md:mb-20">
       <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-[0.1em] mb-4 md:mb-5">
@@ -81,11 +86,11 @@ function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickM
 
       <form 
         onSubmit={triggerCheckout}
-        className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-1.5 flex flex-col md:flex-row gap-1.5 shadow-sm focus-within:border-[var(--accent)] transition-all mb-4"
+        noValidate
+        className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-1.5 flex flex-col md:flex-row gap-1.5 shadow-sm focus-within:border-[var(--accent)] transition-all mb-3 relative"
       >
         <input 
           type="url" 
-          required
           placeholder="https://yourwebsite.com" 
           value={quickWebsiteUrl}
           onChange={(e) => setQuickWebsiteUrl(e.target.value)}
@@ -94,7 +99,6 @@ function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickM
         <div className="hidden md:block w-px bg-[var(--border)] my-2" />
         <input 
           type="text" 
-          required
           placeholder="Your claim..." 
           value={quickMessage}
           onChange={(e) => setQuickMessage(e.target.value)}
@@ -107,6 +111,25 @@ function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickM
           Replace #1
         </button>
       </form>
+      
+      {quickError && (
+        <div className="text-red-500 font-bold text-[13px] mb-3 animate-in fade-in zoom-in-95">
+          {quickError}
+        </div>
+      )}
+      
+      <div className="flex flex-wrap justify-center gap-2.5 mb-8 max-w-2xl w-full px-2">
+        {['Built different.', 'Watch me take #1.', 'Someone has to replace me.', 'Try to replace me.', 'Your move.'].map(ex => (
+          <button 
+            key={ex}
+            type="button"
+            onClick={() => setQuickMessage(ex)}
+            className="text-[13px] font-medium text-[var(--secondary)] hover:text-[var(--foreground)] bg-[var(--surface-elevated)] border border-[var(--border-soft)] px-3.5 py-1.5 rounded-full transition-colors active:scale-95"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
       
       <p className="text-[14px] text-[var(--secondary)] font-medium">
         Take the spot. Hold it until someone replaces you.
@@ -136,7 +159,7 @@ function HowItWorks() {
   )
 }
 
-function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName, holderWebsiteLogo, holderMessage, reignTime, currentPrice, triggerCheckout }: CurrentHolderCardProps) {
+function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName, holderWebsiteLogo, holderMessage, reignTime, currentPrice, triggerCheckout, viewsCount, clicksCount, liveViewers }: CurrentHolderCardProps) {
   return (
     <section className="w-full max-w-5xl mb-16 md:mb-20">
       <h3 className="text-[12px] md:text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 pl-1">CURRENT #1</h3>
@@ -177,9 +200,9 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
             </div>
           )}
           
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
             <a
-              href={holderWebsiteUrl.startsWith('http') ? holderWebsiteUrl : `https://${holderWebsiteUrl}`}
+              href={`/api/click/current?client_id=${typeof window !== 'undefined' ? getClientId() : ''}`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 text-[var(--accent)] font-semibold hover:opacity-80 transition-opacity truncate max-w-full sm:max-w-[200px]"
@@ -191,6 +214,10 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
             <span className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 shrink-0" /> 
               Held #1 for {reignTime}
+            </span>
+
+            <span className="flex items-center gap-1.5 whitespace-nowrap bg-[var(--surface)] border border-[var(--border-soft)] px-2 py-0.5 rounded-md shadow-sm">
+              👁 {viewsCount.toLocaleString()} views · 🔥 {clicksCount.toLocaleString()} clicks · <span className="text-[var(--success)] ml-1 mr-0.5 h-1.5 w-1.5 rounded-full inline-block animate-pulse bg-current" /> {liveViewers} live
             </span>
           </div>
         </div>
@@ -245,9 +272,15 @@ function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
         <span className="text-[14px] text-[var(--foreground)] font-medium truncate">
           replaced {rep.previous_website_name || 'someone'}
         </span>
-        <span className="text-[12px] md:text-[13px] text-[var(--muted)] font-medium mt-0.5">
-          {timeAgo(rep.created_at)}
-        </span>
+        <div className="text-[12px] md:text-[13px] text-[var(--muted)] font-medium mt-0.5 flex flex-wrap items-center gap-2">
+          <span>{timeAgo(rep.created_at)}</span>
+          {Number(rep.views_count) > 0 && (
+            <span>· 👁 {Number(rep.views_count).toLocaleString()} views</span>
+          )}
+          {Number(rep.clicks_count) > 0 && (
+            <span>· 🔥 {Number(rep.clicks_count).toLocaleString()} clicks</span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center sm:justify-end flex-shrink-0 pl-14 sm:pl-0">
@@ -351,6 +384,7 @@ function HomeContent() {
   // Quick form state
   const [quickWebsiteUrl, setQuickWebsiteUrl] = useState('')
   const [quickMessage, setQuickMessage] = useState('')
+  const [quickError, setQuickError] = useState('')
 
   const fetchGameState = useCallback(async () => {
     if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
@@ -399,7 +433,9 @@ function HomeContent() {
           previous_website_logo,
           new_website_url,
           new_website_name,
-          new_website_logo
+          new_website_logo,
+          views_count,
+          clicks_count
         `)
         .order('created_at', { ascending: false })
         .limit(10)
@@ -480,6 +516,48 @@ function HomeContent() {
     return () => clearInterval(timer)
   }, [currentHolder])
 
+  const [liveViewers, setLiveViewers] = useState(1)
+
+  useEffect(() => {
+    if (!currentHolder?.website_url) return
+
+    const trackViewAndPresence = async () => {
+      const clientId = getClientId()
+      // track view
+      await fetch('/api/view/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, websiteUrl: currentHolder.website_url })
+      }).catch(console.error)
+
+      // presence heartbeat
+      const ping = async () => {
+        try {
+          const res = await fetch('/api/presence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId, websiteUrl: currentHolder.website_url })
+          })
+          const data = await res.json()
+          if (data.liveViewers) {
+            setLiveViewers(data.liveViewers)
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      
+      ping()
+      const interval = setInterval(ping, 30000)
+      return () => clearInterval(interval)
+    }
+
+    const cleanup = trackViewAndPresence()
+    return () => {
+      cleanup.then(fn => fn && fn())
+    }
+  }, [currentHolder?.website_url])
+
   useEffect(() => {
     if (searchParams.get('checkout') === 'true') {
       setTimeout(() => setCheckoutOpen(true), 0)
@@ -489,6 +567,30 @@ function HomeContent() {
 
   const triggerCheckout = (e?: FormEvent) => {
     if (e) e.preventDefault()
+    
+    // Clear any previous error
+    setQuickError('')
+    
+    // Manual Validation
+    if (!quickWebsiteUrl) {
+      setQuickError('Please enter a website URL.')
+      return
+    }
+    
+    // Loose URL format validation
+    try {
+      const urlToTest = quickWebsiteUrl.startsWith('http') ? quickWebsiteUrl : `https://${quickWebsiteUrl}`
+      new URL(urlToTest)
+    } catch {
+      setQuickError('Please enter a valid website URL.')
+      return
+    }
+    
+    if (!quickMessage) {
+      setQuickError('Please enter a claim message.')
+      return
+    }
+    
     setCheckoutOpen(true)
   }
 
@@ -524,10 +626,11 @@ function HomeContent() {
         <HeroSection 
           currentPrice={currentPrice}
           quickWebsiteUrl={quickWebsiteUrl}
-          setQuickWebsiteUrl={setQuickWebsiteUrl}
+          setQuickWebsiteUrl={(val) => { setQuickWebsiteUrl(val); setQuickError(''); }}
           quickMessage={quickMessage}
-          setQuickMessage={setQuickMessage}
+          setQuickMessage={(val) => { setQuickMessage(val); setQuickError(''); }}
           triggerCheckout={triggerCheckout}
+          quickError={quickError}
         />
 
         <HowItWorks />
@@ -541,6 +644,9 @@ function HomeContent() {
           reignTime={reignTime}
           currentPrice={currentPrice}
           triggerCheckout={triggerCheckout}
+          viewsCount={currentHolder?.views_count || 0}
+          clicksCount={currentHolder?.clicks_count || 0}
+          liveViewers={liveViewers}
         />
 
         {/* MAIN GRID: RECENT & ACTIVITY */}

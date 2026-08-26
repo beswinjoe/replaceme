@@ -39,10 +39,12 @@ export async function POST(req: Request) {
 
     const dodo = new DodoPayments({
       bearerToken: apiKey,
-      environment: process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'test_mode' : 'live_mode',
+      environment: (process.env.DODO_ENVIRONMENT as any) || (process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? 'test_mode' : 'live_mode'),
     })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null) || 
+                   'http://localhost:3000'
 
     // 3. Create Checkout Session
     const session = await dodo.checkoutSessions.create({
