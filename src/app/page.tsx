@@ -457,22 +457,24 @@ function HomeContent() {
       
       setError(false)
     } catch (err: any) {
-      console.error('Failed to load game state from Supabase:', err.message || err)
-      console.log('Falling back to local demo state for UI development...')
-      
-      setCurrentHolder({
-        current_price: 1.00,
-        replaced_at: new Date().toISOString(),
-        custom_message: 'Someone has to be first. Replace me to start the game.',
-        website_url: 'replaceme.lol',
-        website_name: 'ReplaceMe',
-        website_logo: '/replaceme-avatar.svg'
-      })
-      setReplacementsCount(0)
-      setRecentReplacements([])
-      setTotalSpent(0)
-      setLongestReign(0)
-      setError(false)
+      if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+        console.log('Falling back to local demo state for UI development...')
+        setCurrentHolder({
+          current_price: 1.00,
+          replaced_at: new Date().toISOString(),
+          custom_message: 'Someone has to be first. Replace me to start the game.',
+          website_url: 'replaceme.lol',
+          website_name: 'ReplaceMe',
+          website_logo: '/replaceme-avatar.svg'
+        })
+        setReplacementsCount(0)
+        setRecentReplacements([])
+        setTotalSpent(0)
+        setLongestReign(0)
+        setError(false)
+      } else {
+        setError(true)
+      }
     } finally {
       setLoading(false)
     }
@@ -516,7 +518,7 @@ function HomeContent() {
     return () => clearInterval(timer)
   }, [currentHolder])
 
-  const [liveViewers, setLiveViewers] = useState(1)
+  const [liveViewers, setLiveViewers] = useState(0)
 
   useEffect(() => {
     if (!currentHolder?.website_url) return

@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
 
     if (countError) {
       console.error('Error counting presence:', countError)
-      return NextResponse.json({ liveViewers: 1 }) // fallback to 1 (them)
+      return NextResponse.json({ liveViewers: 0 }) // fallback to 0
     }
 
-    return NextResponse.json({ liveViewers: count || 1 })
+    return NextResponse.json({ liveViewers: count || 0 })
   } catch (err) {
     console.error('Presence tracking error:', err)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

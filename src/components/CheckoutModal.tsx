@@ -38,26 +38,55 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
   }, [isOpen, prefilledData, currentPrice])
 
   useEffect(() => {
-    try {
-      if (!websiteInput) {
-         setDomain('')
-         setWebsiteName('')
-         setLogoUrl('')
-         return
+    let active = true
+    const timer = setTimeout(async () => {
+      try {
+        if (!websiteInput) {
+           if (active) {
+             setDomain('')
+             setWebsiteName('')
+             setLogoUrl('')
+           }
+           return
+        }
+        
+        const urlStr = websiteInput.startsWith('http') ? websiteInput : `https://${websiteInput}`
+        const url = new URL(urlStr)
+        const cleanDomain = url.hostname.replace(/^www\./, '')
+        
+        if (active) {
+          setDomain(cleanDomain)
+          const nameFallback = cleanDomain.split('.')[0]
+          setWebsiteName(nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)) 
+        }
+
+        const res = await fetch(`/api/metadata?url=${encodeURIComponent(urlStr)}`)
+        if (!res.ok) throw new Error('Metadata fetch failed')
+        
+        const data = await res.json()
+        if (active && data.logoUrl) {
+          setLogoUrl(data.logoUrl)
+        }
+      } catch (e) {
+        if (active && websiteInput) {
+           // Basic fallback if fetch totally fails or URL is invalid
+           try {
+             const urlStr = websiteInput.startsWith('http') ? websiteInput : `https://${websiteInput}`
+             const url = new URL(urlStr)
+             const cleanDomain = url.hostname.replace(/^www\./, '')
+             setDomain(cleanDomain)
+             setLogoUrl(`/api/avatar/${encodeURIComponent(cleanDomain)}`)
+           } catch {
+             setDomain('')
+             setLogoUrl('')
+           }
+        }
       }
-      // Ensure we can parse it as a URL
-      const urlStr = websiteInput.startsWith('http') ? websiteInput : `https://${websiteInput}`
-      const url = new URL(urlStr)
-      const cleanDomain = url.hostname.replace(/^www\./, '')
-      
-      setDomain(cleanDomain)
-      // Capitalize first letter of domain as a decent fallback for website name
-      const nameFallback = cleanDomain.split('.')[0]
-      setWebsiteName(nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)) 
-      setLogoUrl(`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`)
-    } catch (e) {
-      // Let user keep typing
-      setDomain('')
+    }, 500)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
     }
   }, [websiteInput])
 
