@@ -3,9 +3,9 @@ import { createClient } from '@/utils/supabase/server'
 import { Share, ArrowLeft, RefreshCcw } from 'lucide-react'
 import Link from 'next/link'
 
-import { cookies } from 'next/headers'
-
-interface SuccessPageProps {}
+interface SuccessPageProps {
+  searchParams: Promise<{ payment_id?: string }>
+}
 
 async function PaymentStatus({ sessionId }: { sessionId: string }) {
   const supabase = await createClient()
@@ -16,7 +16,7 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
     const { data } = await supabase
       .from('payments')
       .select('*')
-      .eq('dodo_payment_id', sessionId)
+      .eq('metadata->metadata->>payment_id', sessionId)
       .single()
     
     if (data) {
@@ -38,7 +38,7 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
           <p>Your payment may still be processing on the provider&apos;s end.</p>
           <p>Refresh this page in a moment to check again.</p>
         </div>
-        <Link href={`/checkout/success?session_id=${sessionId}`} className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
+        <Link href={`/checkout/success?payment_id=${sessionId}`} className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
           <RefreshCcw className="w-4 h-4" /> Refresh Status
         </Link>
       </div>
@@ -161,11 +161,10 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
   )
 }
 
-export default async function CheckoutSuccessPage() {
-  const cookieStore = await cookies()
-  const session_id = cookieStore.get('dodo_session_id')?.value
+export default async function CheckoutSuccessPage({ searchParams }: SuccessPageProps) {
+  const { payment_id } = await searchParams
 
-  if (!session_id) {
+  if (!payment_id) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
         <div className="text-center">
@@ -180,7 +179,7 @@ export default async function CheckoutSuccessPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
       <div className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border)] rounded-[24px] p-8 md:p-12 shadow-2xl">
         <Suspense fallback={<div className="text-center text-[var(--muted)]">Loading payment status...</div>}>
-          <PaymentStatus sessionId={session_id} />
+          <PaymentStatus sessionId={payment_id} />
         </Suspense>
       </div>
     </div>

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createAdminClient } from '@/utils/supabase/admin'
 import DodoPayments from 'dodopayments'
+import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: Request) {
   try {
@@ -46,6 +48,8 @@ export async function POST(req: Request) {
                    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null) || 
                    'http://localhost:3000'
 
+    const paymentId = uuidv4()
+
     // 3. Create Checkout Session
     const session = await dodo.checkoutSessions.create({
       product_cart: [
@@ -56,6 +60,7 @@ export async function POST(req: Request) {
         },
       ],
       metadata: {
+        payment_id: paymentId,
         website_url: website_url,
         website_name: website_name || website_url,
         website_logo: website_logo || '',
@@ -63,13 +68,10 @@ export async function POST(req: Request) {
         quoted_price: currentPrice.toString(),
         quote_created_at: new Date().toISOString(),
       },
-      return_url: `${appUrl}/checkout/success`,
+      return_url: `${appUrl}/checkout/success?payment_id=${paymentId}`,
     })
 
-    const response = NextResponse.json({ url: session.checkout_url, sessionId: session.session_id })
-    response.cookies.set('dodo_session_id', session.session_id, { maxAge: 60 * 15 }) // 15 mins
-    
-    return response
+    return NextResponse.json({ url: session.checkout_url, sessionId: session.session_id })
   } catch (error: any) {
     console.error('Checkout error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
