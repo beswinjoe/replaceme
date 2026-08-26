@@ -155,6 +155,18 @@ create policy "Allow users to update/read-status their own notifications"
 
 
 -- 8. SYSTEM USER AND SEED DATA SETUP
+-- Insert system user into auth.users first to satisfy foreign key constraint
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at)
+values (
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  'authenticated',
+  'authenticated',
+  'system@replaceme.lol',
+  'placeholder_password_hash',
+  now()
+) on conflict (id) do nothing;
+
 -- Insert system user (for initial state)
 insert into public.users (id, username, display_name, avatar_url, bio, website_url)
 values (
