@@ -34,13 +34,6 @@ interface CurrentHolderCardProps {
   liveViewers: number
   activeReignId: string
 }
-
-interface StatsStripProps {
-  replacementsCount: number
-  totalSpent: number
-  longestReign: number
-}
-
 // --- HELPER COMPONENTS ---
 
 const formatDuration = (sec: number) => {
@@ -243,97 +236,6 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
   )
 }
 
-function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
-  return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[var(--surface)] border border-[var(--border)] rounded-[16px] hover:border-[var(--muted)] transition-colors gap-4">
-      <div className="flex items-center gap-4 w-full sm:w-auto flex-shrink-0">
-        <span className="text-[14px] md:text-[15px] font-bold text-[var(--muted)] w-8 text-center tabular-nums">
-          #{idx + 2}
-        </span>
-        {rep.new_website_logo ? (
-          <img 
-            src={rep.new_website_logo}
-            alt={rep.new_website_name}
-            className="w-10 h-10 rounded-[8px] border border-[var(--border)] object-contain bg-white shrink-0"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-[8px] border border-[var(--border)] flex items-center justify-center text-gray-400 font-bold shrink-0">
-            W
-          </div>
-        )}
-        <div className="flex flex-col">
-          <span className="text-[15px] font-bold text-[var(--foreground)] leading-tight">
-            {rep.new_website_name}
-          </span>
-          <span className="text-[13px] text-[var(--secondary)] font-medium truncate max-w-[150px]">{rep.new_website_url?.replace(/^https?:\/\//, '')}</span>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col justify-center sm:px-4 w-full sm:w-auto pl-14 sm:pl-0 min-w-0">
-        <span className="text-[14px] text-[var(--foreground)] font-medium truncate">
-          replaced {rep.previous_website_name || 'someone'}
-        </span>
-        <div className="text-[12px] md:text-[13px] text-[var(--muted)] font-medium mt-0.5 flex flex-wrap items-center gap-2">
-          <span>{timeAgo(rep.created_at)}</span>
-          {Number(rep.views_count) > 0 && (
-            <span>· 👁 {Number(rep.views_count).toLocaleString()} views</span>
-          )}
-          {Number(rep.clicks_count) > 0 && (
-            <span>· 🔥 {Number(rep.clicks_count).toLocaleString()} clicks</span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center sm:justify-end flex-shrink-0 pl-14 sm:pl-0">
-        <span className="text-[16px] md:text-[18px] font-bold text-[var(--foreground)] tabular-nums">
-          ${Number(rep.amount_paid).toFixed(2)}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function StatsStrip({ replacementsCount, totalSpent, longestReign }: StatsStripProps) {
-  return (
-    <section className="w-full max-w-5xl py-12 border-t border-[var(--border)] mt-16">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center md:text-left">
-        <div>
-          <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
-            {replacementsCount.toLocaleString()}
-          </div>
-          <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
-            Replacements
-          </div>
-        </div>
-        <div>
-          <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
-            {totalSpent > 0 ? `$${totalSpent.toFixed(0)}` : '—'}
-          </div>
-          <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
-            Total Spent
-          </div>
-        </div>
-        <div>
-          <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
-            {longestReign > 0 ? formatDuration(longestReign) : '—'}
-          </div>
-          <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
-            Longest Reign
-          </div>
-        </div>
-        <div>
-          <div className="text-[28px] md:text-[32px] font-bold text-[var(--foreground)] tabular-nums">
-             —
-          </div>
-          <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-wider mt-1">
-            Online Now
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function PageSkeleton() {
   return (
     <div className="flex-1 flex flex-col items-center pt-12 md:pt-16 pb-24 px-4 md:px-6 lg:px-8 max-w-[1240px] mx-auto w-full animate-pulse">
@@ -345,19 +247,6 @@ function PageSkeleton() {
       
       {/* Current #1 Skeleton */}
       <div className="w-full max-w-5xl h-[180px] bg-[var(--border)] rounded-[16px] mb-14" />
-      
-      {/* Grid Skeleton */}
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(280px,0.8fr)] gap-10 lg:gap-16 items-start">
-        <div className="w-full space-y-3">
-          <div className="w-40 h-6 bg-[var(--border)] rounded mb-5" />
-          <div className="w-full h-20 bg-[var(--border)] rounded-[16px]" />
-          <div className="w-full h-20 bg-[var(--border)] rounded-[16px]" />
-        </div>
-        <div className="w-full">
-          <div className="w-32 h-4 bg-[var(--border)] rounded mb-6" />
-          <div className="w-full h-40 bg-[var(--border)] rounded-[16px]" />
-        </div>
-      </div>
     </div>
   )
 }
@@ -373,14 +262,8 @@ function HomeContent() {
   const [currentHolder, setCurrentHolder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [replacementsCount, setReplacementsCount] = useState(0)
-  const [recentReplacements, setRecentReplacements] = useState<any[]>([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [reignTime, setReignTime] = useState('0s')
-  
-  // Real stats
-  const [totalSpent, setTotalSpent] = useState(0)
-  const [longestReign, setLongestReign] = useState(0)
 
   // Quick form state
   const [quickWebsiteUrl, setQuickWebsiteUrl] = useState('')
@@ -397,10 +280,6 @@ function HomeContent() {
         website_name: 'ReplaceMe',
         website_logo: '/replaceme-avatar.svg'
       })
-      setReplacementsCount(0)
-      setRecentReplacements([])
-      setTotalSpent(0)
-      setLongestReign(0)
       setError(false)
       setLoading(false)
       return
@@ -432,47 +311,6 @@ function HomeContent() {
 
       setCurrentHolder({ ...holder, views_count: viewsCount, clicks_count: clicksCount })
 
-      const { count, error: countError } = await supabase
-        .from('replacements')
-        .select('*', { count: 'exact', head: true })
-
-      if (countError) throw countError
-      setReplacementsCount(count || 0)
-
-      const { data: recent, error: recentError } = await supabase
-        .from('replacements')
-        .select(`
-          id,
-          amount_paid,
-          created_at,
-          previous_holder_duration,
-          previous_website_url,
-          previous_website_name,
-          previous_website_logo,
-          new_website_url,
-          new_website_name,
-          new_website_logo,
-          views_count,
-          clicks_count
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (recentError) throw recentError
-      setRecentReplacements(recent || [])
-
-      // Fetch accurate statistics
-      const { data: stats, error: statsError } = await supabase
-        .from('replacements')
-        .select('amount_paid, previous_holder_duration')
-      
-      if (!statsError && stats) {
-        const sum = stats.reduce((acc, curr) => acc + Number(curr.amount_paid), 0)
-        const maxReign = stats.reduce((max, curr) => Math.max(max, Number(curr.previous_holder_duration || 0)), 0)
-        setTotalSpent(sum)
-        setLongestReign(maxReign)
-      }
-      
       setError(false)
     } catch (err: any) {
       if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
@@ -485,10 +323,6 @@ function HomeContent() {
           website_name: 'ReplaceMe',
           website_logo: '/replaceme-avatar.svg'
         })
-        setReplacementsCount(0)
-        setRecentReplacements([])
-        setTotalSpent(0)
-        setLongestReign(0)
         setError(false)
       } else {
         setError(true)
@@ -508,16 +342,8 @@ function HomeContent() {
       })
       .subscribe()
 
-    const replacementsChannel = supabase
-      .channel('new-replacements')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'replacements' }, () => {
-        setTimeout(fetchGameState, 0)
-      })
-      .subscribe()
-
     return () => {
       supabase.removeChannel(holderChannel)
-      supabase.removeChannel(replacementsChannel)
     }
   }, [fetchGameState, supabase])
 
@@ -671,71 +497,11 @@ function HomeContent() {
           activeReignId={currentHolder?.active_reign_id || 'genesis'}
         />
 
-        {/* MAIN GRID: RECENT & ACTIVITY */}
-        <section className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(280px,0.8fr)] gap-10 lg:gap-16 items-start">
-          
-          <div className="w-full">
-            <h3 className="text-[24px] md:text-[26px] font-bold text-[var(--foreground)] tracking-tight mb-4 md:mb-5">Recent Replacements</h3>
-            
-            <div className="space-y-3">
-              {recentReplacements.map((rep, idx) => (
-                <ReplacementRow key={rep.id} rep={rep} idx={idx} />
-              ))}
-
-              {recentReplacements.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-[160px] md:h-[180px] text-center bg-[var(--surface)] border border-[var(--border)] rounded-[16px] px-6 shadow-sm">
-                  <h4 className="text-[16px] font-bold text-[var(--foreground)] mb-1">No replacements yet.</h4>
-                  <p className="text-[14px] text-[var(--secondary)] font-medium max-w-sm">
-                    The first person to take #1 will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {recentReplacements.length > 0 && (
-              <div className="pt-5 flex justify-center">
-                <button onClick={() => router.push('/history')} className="text-[13px] md:text-[14px] font-semibold text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors">
-                  View full history →
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="w-full lg:pt-1">
-            <h3 className="text-[12px] md:text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 md:mb-6">Live Activity</h3>
-            
-            {recentReplacements.length > 0 ? (
-              <div className="space-y-4 border-l border-[var(--border)] pl-4">
-                {recentReplacements.slice(0, 6).map(rep => (
-                  <div key={rep.id} className="relative text-[13px] md:text-[14px] text-[var(--secondary)] font-medium leading-relaxed">
-                    <div className="absolute -left-[21px] top-2 w-2 h-2 rounded-full bg-[var(--border)]" />
-                    <p>
-                      <span className="font-bold text-[var(--foreground)]">{rep.new_website_name}</span> replaced <span className="font-bold text-[var(--foreground)]">{rep.previous_website_name || 'someone'}</span> for <span className="tabular-nums font-bold">${Number(rep.amount_paid).toFixed(0)}</span> <span className="text-[var(--muted)] block mt-0.5">{timeAgo(rep.created_at)}</span>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-[var(--surface)] border border-[var(--border)] rounded-full mb-2 shadow-sm">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
-                  <span className="text-[11px] font-bold text-[var(--secondary)] uppercase tracking-widest">LIVE</span>
-                </div>
-                <h4 className="text-[15px] font-bold text-[var(--foreground)]">Waiting for the first battle.</h4>
-                <p className="text-[13px] md:text-[14px] text-[var(--secondary)] font-medium leading-relaxed">
-                  The next replacement will appear here in real time.
-                </p>
-              </div>
-            )}
-          </div>
-
-        </section>
-
-        <StatsStrip 
-          replacementsCount={replacementsCount} 
-          totalSpent={totalSpent} 
-          longestReign={longestReign} 
-        />
+        <div className="pt-8 w-full flex justify-center">
+          <p className="text-[13px] text-[var(--muted)] font-medium">
+            Built by <a href="https://x.com/beswinjoee" target="_blank" rel="noreferrer" className="hover:text-[var(--foreground)] transition-colors">@beswinjoee</a>
+          </p>
+        </div>
 
       </main>
 
