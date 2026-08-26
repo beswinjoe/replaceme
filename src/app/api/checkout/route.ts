@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { createClient as createAdminClient } from '@/utils/supabase/admin'
 import DodoPayments from 'dodopayments'
-import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(req: Request) {
   try {
@@ -48,7 +46,7 @@ export async function POST(req: Request) {
                    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null) || 
                    'http://localhost:3000'
 
-    const paymentId = uuidv4()
+    const paymentId = crypto.randomUUID()
 
     // 3. Create Checkout Session
     const session = await dodo.checkoutSessions.create({
