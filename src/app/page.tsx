@@ -32,6 +32,7 @@ interface CurrentHolderCardProps {
   viewsCount: number
   clicksCount: number
   liveViewers: number
+  activeReignId: string
 }
 
 interface StatsStripProps {
@@ -159,7 +160,7 @@ function HowItWorks() {
   )
 }
 
-function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName, holderWebsiteLogo, holderMessage, reignTime, currentPrice, triggerCheckout, viewsCount, clicksCount, liveViewers }: CurrentHolderCardProps) {
+function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName, holderWebsiteLogo, holderMessage, reignTime, currentPrice, triggerCheckout, viewsCount, clicksCount, liveViewers, activeReignId }: CurrentHolderCardProps) {
   return (
     <section className="w-full max-w-5xl mb-16 md:mb-20">
       <h3 className="text-[12px] md:text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 pl-1">CURRENT #1</h3>
@@ -202,7 +203,7 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
             <a
-              href={`/api/click/current?client_id=${typeof window !== 'undefined' ? getClientId() : ''}`}
+              href={`/api/click/${activeReignId}?client_id=${typeof window !== 'undefined' ? getClientId() : ''}`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 text-[var(--accent)] font-semibold hover:opacity-80 transition-opacity truncate max-w-full sm:max-w-[200px]"
@@ -216,7 +217,7 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
               Held #1 for {reignTime}
             </span>
 
-            <span className="flex items-center gap-1.5 whitespace-nowrap bg-[var(--surface)] border border-[var(--border-soft)] px-2 py-0.5 rounded-md shadow-sm">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-[var(--muted)]">
               👁 {viewsCount.toLocaleString()} views · 🔥 {clicksCount.toLocaleString()} clicks · <span className="text-[var(--success)] ml-1 mr-0.5 h-1.5 w-1.5 rounded-full inline-block animate-pulse bg-current" /> {liveViewers} live
             </span>
           </div>
@@ -521,15 +522,16 @@ function HomeContent() {
   const [liveViewers, setLiveViewers] = useState(0)
 
   useEffect(() => {
-    if (!currentHolder?.website_url) return
+    if (!currentHolder) return
 
     const trackViewAndPresence = async () => {
       const clientId = getClientId()
+      const reignId = currentHolder.active_reign_id || 'genesis'
       // track view
-      await fetch('/api/view/current', {
+      await fetch(`/api/view/${reignId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, websiteUrl: currentHolder.website_url })
+        body: JSON.stringify({ clientId })
       }).catch(console.error)
 
       // presence heartbeat
@@ -538,7 +540,7 @@ function HomeContent() {
           const res = await fetch('/api/presence', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientId, websiteUrl: currentHolder.website_url })
+            body: JSON.stringify({ clientId, reignId })
           })
           const data = await res.json()
           if (data.liveViewers) {
@@ -558,7 +560,7 @@ function HomeContent() {
     return () => {
       cleanup.then(fn => fn && fn())
     }
-  }, [currentHolder?.website_url])
+  }, [currentHolder?.active_reign_id])
 
   useEffect(() => {
     if (searchParams.get('checkout') === 'true') {
@@ -649,6 +651,7 @@ function HomeContent() {
           viewsCount={currentHolder?.views_count || 0}
           clicksCount={currentHolder?.clicks_count || 0}
           liveViewers={liveViewers}
+          activeReignId={currentHolder?.active_reign_id || 'genesis'}
         />
 
         {/* MAIN GRID: RECENT & ACTIVITY */}

@@ -5,10 +5,10 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
 
   try {
-    const { clientId, websiteUrl } = await request.json()
+    const { clientId, reignId } = await request.json()
 
-    if (!clientId || !websiteUrl) {
-      return NextResponse.json({ error: 'Missing clientId or websiteUrl' }, { status: 400 })
+    if (!clientId || !reignId) {
+      return NextResponse.json({ error: 'Missing clientId or reignId' }, { status: 400 })
     }
 
     // Upsert presence (we'll just use insert on conflict update)
@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase
       .from('live_presence')
       .upsert(
-        { website_url: websiteUrl, client_id: clientId, last_seen_at: new Date().toISOString() },
-        { onConflict: 'website_url,client_id' }
+        { reign_id: reignId, client_id: clientId, last_seen_at: new Date().toISOString() },
+        { onConflict: 'reign_id,client_id' }
       )
     
     if (error) {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const { count, error: countError } = await supabase
       .from('live_presence')
       .select('*', { count: 'exact', head: true })
-      .eq('website_url', websiteUrl)
+      .eq('reign_id', reignId)
       .gte('last_seen_at', fortyFiveSecondsAgo)
 
     if (countError) {

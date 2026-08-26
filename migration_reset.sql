@@ -23,6 +23,7 @@ CREATE TABLE public.current_holder (
   logo_source text default 'fallback' not null,
   views_count integer default 0 not null,
   clicks_count integer default 0 not null,
+  active_reign_id uuid,
   constraint sole_row check (id = '00000000-0000-0000-0000-000000000000'::uuid)
 );
 
@@ -81,14 +82,17 @@ CREATE TABLE public.reign_events (
   constraint unique_event_per_client unique (replacement_id, client_id, event_type)
 );
 
+-- 3. CREATE LIVE PRESENCE TABLE
 CREATE TABLE public.live_presence (
-  website_url text not null,
+  reign_id uuid not null,
   client_id text not null,
   last_seen_at timestamptz default now() not null,
-  primary key (website_url, client_id)
+  primary key (reign_id, client_id)
 );
 
--- 3. ENABLE RLS
+CREATE INDEX idx_live_presence_reign_time on public.live_presence(reign_id, last_seen_at);
+
+-- 4. ENABLE RLS
 ALTER TABLE public.current_holder ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to current holder" on public.current_holder for select using (true);
 

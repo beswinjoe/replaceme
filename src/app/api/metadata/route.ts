@@ -23,7 +23,8 @@ function resolveUrl(relativeUrl: string, baseUrl: URL): string {
   }
 }
 
-async function validateImageUrl(url: string): Promise<boolean> {
+// Check reachability and verify it's an image
+async function checkReachability(url: string): Promise<boolean> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 2000)
@@ -34,8 +35,6 @@ async function validateImageUrl(url: string): Promise<boolean> {
        if (ct && (ct.startsWith('image/') || ct === 'application/octet-stream' || ct === 'image/svg+xml')) {
          return true
        }
-       // If no content-type or unknown, it might still be an image.
-       // Let's assume true if it was a 2xx response and it doesn't clearly say text/html
        if (ct && ct.includes('text/html')) return false
        return true
     }
@@ -43,6 +42,15 @@ async function validateImageUrl(url: string): Promise<boolean> {
     return false
   }
   return false
+}
+
+interface Candidate {
+  url: string
+  size: number
+  isSvg: boolean
+  isPlatformDefault: boolean
+  isFaviconIco: boolean
+  score?: number
 }
 
 export async function GET(request: NextRequest) {
@@ -63,11 +71,10 @@ export async function GET(request: NextRequest) {
 
   const cleanDomain = url.hostname.replace(/^www\./, '')
   const isPlatformDomain = PLATFORM_DOMAINS.some(d => cleanDomain.endsWith(d))
-  
   const avatarFallback = `/api/avatar/${encodeURIComponent(cleanDomain)}`
 
   let websiteName = cleanDomain
-  let logoUrl = ''
+  let finalLogoUrl = ''
   let logoSource = 'fallback'
 
   try {
@@ -85,87 +92,118 @@ export async function GET(request: NextRequest) {
       const html = await res.text()
       const $ = cheerio.load(html)
       
-      // 1. Resolve Website Name
+      // 1. Resolve Website Name strictly respecting metadata strength
       const ogSiteName = $('meta[property="og:site_name"]').attr('content')
       const appName = $('meta[name="application-name"]').attr('content')
-      const title = $('title').text()
       
       if (ogSiteName) {
         websiteName = ogSiteName.trim()
       } else if (appName) {
         websiteName = appName.trim()
-      } else if (title) {
-        // Remove common title suffixes
-        websiteName = title.split('|')[0].split('-')[0].trim()
-      }
-
-      // 2. Resolve Logo from HTML tags
-      const iconSelectors = [
-        'link[rel="apple-touch-icon"]',
-        'link[rel="apple-touch-icon-precomposed"]',
-        'link[rel="icon"][sizes="512x512"]',
-        'link[rel="icon"][sizes="192x192"]',
-        'link[rel="icon"][sizes="180x180"]',
-        'link[rel="icon"][type="image/svg+xml"]',
-        'link[rel="shortcut icon"]',
-        'link[rel="icon"]',
-      ]
-      
-      let candidates: string[] = []
-      
-      // First try to check for a manifest
-      const manifestHref = $('link[rel="manifest"]').attr('href')
-      if (manifestHref) {
-        try {
-          const manifestUrl = resolveUrl(manifestHref, url)
-          const mController = new AbortController()
-          const mTimeout = setTimeout(() => mController.abort(), 1500)
-          const mRes = await fetch(manifestUrl, { signal: mController.signal })
-          clearTimeout(mTimeout)
-          
-          if (mRes.ok) {
-            const manifest = await mRes.json()
-            if (manifest.icons && Array.isArray(manifest.icons) && manifest.icons.length > 0) {
-              const sortedIcons = manifest.icons.sort((a: any, b: any) => {
-                if (a.type === 'image/svg+xml') return -1
-                if (b.type === 'image/svg+xml') return 1
-                const sizeA = parseInt(a.sizes?.split('x')[0] || '0')
-                const sizeB = parseInt(b.sizes?.split('x')[0] || '0')
-                return sizeB - sizeA
-              })
-              for (const icon of sortedIcons) {
-                if (icon.src) {
-                  candidates.push(resolveUrl(icon.src, url))
-                }
-              }
-            }
+      } else {
+        // We only parse manifest for name if OG doesn't exist
+        let manifestName = null
+        const manifestHref = $('link[rel="manifest"]').attr('href')
+        if (manifestHref) {
+           try {
+             const mRes = await fetch(resolveUrl(manifestHref, url))
+             if (mRes.ok) {
+               const mJson = await mRes.json()
+               manifestName = mJson.name || mJson.short_name
+             }
+           } catch { /* ignore */ }
+        }
+        
+        if (manifestName) {
+          websiteName = manifestName.trim()
+        } else {
+          // Last resort: Title
+          const title = $('title').text()
+          if (title) {
+            // We ONLY use title as is, if we split, we might break things like "John Doe — AI Engineer"
+            // We just use it, or fallback to domain.
+            websiteName = title.trim()
           }
-        } catch {
-          // ignore manifest fetch errors
         }
       }
 
-      // Collect from HTML tags in priority order
-      for (const selector of iconSelectors) {
-        $(selector).each((_, el) => {
-          const href = $(el).attr('href')
-          if (href) {
-            candidates.push(resolveUrl(href, url))
-          }
+      // 2. Resolve Logo Candidates
+      const candidates: Candidate[] = []
+      const seenUrls = new Set<string>()
+
+      const addCandidate = (href: string, type: string = '', sizes: string = '') => {
+        if (!href) return
+        const fullUrl = resolveUrl(href, url)
+        if (seenUrls.has(fullUrl)) return
+        seenUrls.add(fullUrl)
+        
+        let sizeScore = 0
+        if (sizes && sizes.includes('x')) {
+          sizeScore = parseInt(sizes.split('x')[0], 10) || 0
+        }
+
+        candidates.push({
+          url: fullUrl,
+          size: sizeScore,
+          isSvg: type === 'image/svg+xml' || fullUrl.endsWith('.svg'),
+          isFaviconIco: fullUrl.endsWith('/favicon.ico'),
+          isPlatformDefault: isPlatformDomain && fullUrl.includes(cleanDomain.split('.')[1] || 'default') // simplistic heuristic for platform defaults
         })
       }
 
-      // Add default favicon.ico at the very end
-      candidates.push(resolveUrl('/favicon.ico', url))
+      // Read Manifest Icons
+      const manifestHref = $('link[rel="manifest"]').attr('href')
+      if (manifestHref) {
+        try {
+          const mRes = await fetch(resolveUrl(manifestHref, url))
+          if (mRes.ok) {
+            const mJson = await mRes.json()
+            if (mJson.icons && Array.isArray(mJson.icons)) {
+              mJson.icons.forEach((icon: any) => addCandidate(icon.src, icon.type, icon.sizes))
+            }
+          }
+        } catch { /* ignore */ }
+      }
 
-      // Deduplicate candidates
-      candidates = Array.from(new Set(candidates))
+      // Read HTML Icons
+      $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"], link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
+        addCandidate($(el).attr('href') || '', $(el).attr('type') || '', $(el).attr('sizes') || '')
+      })
 
-      // Test candidates sequentially and pick the first valid one
-      for (const candidate of candidates) {
-        const isValid = await validateImageUrl(candidate)
-        if (isValid) {
-          logoUrl = candidate
+      // Add default favicon
+      addCandidate('/favicon.ico')
+
+      // 3. Score and Filter Candidates
+      for (const cand of candidates) {
+        cand.score = 0
+        
+        // Penalize platform domain logos severely unless we have nothing else
+        if (isPlatformDomain && cand.url.includes('favicon.ico')) cand.score -= 1000
+
+        if (cand.size >= 512) cand.score += 500
+        else if (cand.size >= 192) cand.score += 400
+        else if (cand.size >= 128) cand.score += 300
+        else if (cand.size >= 64) cand.score += 200
+        else if (cand.size > 0) cand.score += 100
+        
+        // High-res SVG is great, but tiny SVG isn't necessarily better than big PNG
+        if (cand.isSvg) cand.score += 350
+        
+        if (cand.isFaviconIco) cand.score += 10 // Last resort
+      }
+
+      // Sort by score descending
+      candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
+
+      // 4. Test Reachability Sequentially
+      for (const cand of candidates) {
+        if (await checkReachability(cand.url)) {
+          // If it's a platform domain and the only thing we found was the default favicon, 
+          // we reject it and force the domain initial fallback.
+          if (isPlatformDomain && cand.isFaviconIco && cand.score! <= -900) {
+            break // go to fallback
+          }
+          finalLogoUrl = cand.url
           logoSource = 'detected'
           break
         }
@@ -175,14 +213,16 @@ export async function GET(request: NextRequest) {
     // Ignore fetch errors, fallback below
   }
 
-  if (!logoUrl) {
-    logoUrl = avatarFallback
+  // 5. Fallback logic
+  if (!finalLogoUrl) {
+    finalLogoUrl = avatarFallback
     logoSource = 'fallback'
   }
 
   // Capitalize fallback name if it's still a domain name
   if (websiteName === cleanDomain) {
-    const nameFallback = cleanDomain.split('.')[0]
+    const nameParts = cleanDomain.split('.')
+    const nameFallback = nameParts[0] || cleanDomain
     websiteName = nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)
   }
 
@@ -190,7 +230,7 @@ export async function GET(request: NextRequest) {
     websiteUrl: urlStr,
     domain: cleanDomain,
     websiteName: websiteName,
-    logoUrl: logoUrl,
+    logoUrl: finalLogoUrl,
     logoSource: logoSource
   })
 }
