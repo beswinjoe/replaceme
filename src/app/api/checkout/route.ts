@@ -58,7 +58,6 @@ export async function POST(req: Request) {
         },
       ],
       metadata: {
-        payment_id: paymentId,
         website_url: website_url,
         website_name: website_name || website_url,
         website_logo: website_logo || '',
@@ -66,7 +65,7 @@ export async function POST(req: Request) {
         quoted_price: currentPrice.toString(),
         quote_created_at: new Date().toISOString(),
       },
-      return_url: `${appUrl}/checkout/success?payment_id=${paymentId}`,
+      return_url: `${appUrl}/checkout/success`,
     })
 
     return NextResponse.json({ url: session.checkout_url, sessionId: session.session_id })
