@@ -9,9 +9,10 @@ create table if not exists public.current_holder (
   current_price numeric(12, 2) not null check (current_price >= 0),
   replaced_at timestamptz default now() not null,
   custom_message text,
-  website_url text not null,
-  website_name text not null,
-  website_logo text not null,
+  website_url text not null default 'replaceme.lol',
+  website_name text not null default 'ReplaceMe',
+  website_logo text not null default '/replaceme-avatar.svg',
+  logo_source text default 'fallback' not null,
   views_count integer default 0 not null,
   clicks_count integer default 0 not null,
   created_at timestamptz default now() not null,
@@ -43,6 +44,7 @@ create table if not exists public.replacements (
   views_count integer default 0 not null,
   clicks_count integer default 0 not null,
   custom_message text,
+  logo_source text default 'fallback' not null,
   created_at timestamptz default now() not null
 );
 
@@ -148,17 +150,18 @@ create policy "Allow public read access to live_presence" on public.live_presenc
 
 -- 8. SEED DATA SETUP
 -- Seed the initial holder row
-insert into public.current_holder (id, current_price, custom_message, website_url, website_name, website_logo, replaced_at, views_count, clicks_count)
+insert into public.current_holder (id, current_price, custom_message, website_url, website_name, website_logo, replaced_at, views_count, clicks_count, logo_source)
 values (
-  '00000000-0000-0000-0000-000000000000'::uuid,
+  '00000000-0000-0000-0000-000000000000',
   1.00,
-  'Someone has to be first. Replace me!',
+  'Someone has to be first. Replace me to start the game.',
   'replaceme.lol',
   'ReplaceMe',
   '/replaceme-avatar.svg',
   now(),
   0,
-  0
+  0,
+  'fallback'
 ) on conflict (id) do nothing;
 
 -- Seed Achievements
@@ -203,7 +206,8 @@ create or replace function public.process_payment_and_replace(
   p_new_website_logo text,
   p_amount_paid numeric,
   p_custom_message text,
-  p_metadata jsonb
+  p_metadata jsonb,
+  p_logo_source text default 'fallback'
 ) returns json as $$
 declare
   v_prev_website_url text;
@@ -271,7 +275,8 @@ begin
     views_count,
     clicks_count,
     custom_message,
-    created_at
+    created_at,
+    logo_source
   ) values (
     v_prev_website_url,
     v_prev_website_name,
@@ -286,7 +291,8 @@ begin
     coalesce(v_views_count, 0),
     coalesce(v_clicks_count, 0),
     p_custom_message,
-    now()
+    now(),
+    p_logo_source
   ) returning id into v_replacement_id;
 
   -- Update current holder state and reset counts
@@ -298,7 +304,8 @@ begin
       replaced_at = now(),
       custom_message = p_custom_message,
       views_count = 0,
-      clicks_count = 0
+      clicks_count = 0,
+      logo_source = p_logo_source
   where id = '00000000-0000-0000-0000-000000000000'::uuid;
 
   -- PROCESS ACHIEVEMENTS

@@ -24,6 +24,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
   const [domain, setDomain] = useState('')
   const [websiteName, setWebsiteName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [logoSource, setLogoSource] = useState('fallback')
 
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
@@ -46,6 +47,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
              setDomain('')
              setWebsiteName('')
              setLogoUrl('')
+             setLogoSource('fallback')
            }
            return
         }
@@ -65,7 +67,9 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
         
         const data = await res.json()
         if (active && data.logoUrl) {
+          setWebsiteName(data.websiteName || websiteName) // Update with better name if found
           setLogoUrl(data.logoUrl)
+          setLogoSource(data.logoSource || 'fallback')
         }
       } catch (e) {
         if (active && websiteInput) {
@@ -76,9 +80,11 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
              const cleanDomain = url.hostname.replace(/^www\./, '')
              setDomain(cleanDomain)
              setLogoUrl(`/api/avatar/${encodeURIComponent(cleanDomain)}`)
+             setLogoSource('fallback')
            } catch {
              setDomain('')
              setLogoUrl('')
+             setLogoSource('fallback')
            }
         }
       }
@@ -114,6 +120,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
         website_url: domain,
         website_name: websiteName,
         website_logo: logoUrl,
+        logo_source: logoSource,
         custom_message: customMessage,
       }
 
@@ -234,7 +241,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
                 <img
                   src={logoUrl}
                   alt="website logo"
-                  className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-cover"
+                  className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-contain"
                 />
               ) : (
                 <div className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xs font-medium">

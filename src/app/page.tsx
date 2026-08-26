@@ -174,7 +174,7 @@ function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName,
             <img
               src={holderWebsiteLogo}
               alt={holderWebsiteName}
-              className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-[16px] object-cover border border-[var(--border)] shrink-0 bg-[var(--surface)]"
+              className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-[16px] object-contain border border-[var(--border)] shrink-0 bg-[var(--surface)]"
             />
           ) : (
             <div className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-[16px] border border-[var(--border)] shrink-0 bg-[var(--surface)] flex items-center justify-center text-gray-400 font-bold">
@@ -253,7 +253,7 @@ function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
           <img 
             src={rep.new_website_logo}
             alt={rep.new_website_name}
-            className="w-10 h-10 rounded-[8px] border border-[var(--border)] object-cover bg-white shrink-0"
+            className="w-10 h-10 rounded-[8px] border border-[var(--border)] object-contain bg-white shrink-0"
           />
         ) : (
           <div className="w-10 h-10 rounded-[8px] border border-[var(--border)] flex items-center justify-center text-gray-400 font-bold shrink-0">

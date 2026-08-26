@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const supabase = await createClient()
 
     const body = await req.json()
-    const { website_url, website_name, website_logo, custom_message } = body
+    const { website_url, website_name, website_logo, custom_message, logo_source } = body
 
     if (!website_url) {
       return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
@@ -62,6 +62,7 @@ export async function POST(req: Request) {
         website_url: website_url,
         website_name: website_name || website_url,
         website_logo: website_logo || '',
+        logo_source: logo_source || 'fallback',
         custom_message: custom_message || '',
         quoted_price: currentPrice.toString(),
         quote_created_at: new Date().toISOString(),

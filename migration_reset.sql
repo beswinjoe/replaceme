@@ -20,6 +20,7 @@ CREATE TABLE public.current_holder (
   website_url text not null default 'replaceme.lol',
   website_name text not null default 'ReplaceMe',
   website_logo text not null default '/replaceme-avatar.svg',
+  logo_source text default 'fallback' not null,
   views_count integer default 0 not null,
   clicks_count integer default 0 not null,
   constraint sole_row check (id = '00000000-0000-0000-0000-000000000000'::uuid)
@@ -40,6 +41,7 @@ CREATE TABLE public.replacements (
   views_count integer default 0 not null,
   clicks_count integer default 0 not null,
   custom_message text,
+  logo_source text default 'fallback' not null,
   created_at timestamptz default now() not null
 );
 
@@ -108,7 +110,7 @@ ALTER TABLE public.live_presence ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to live_presence" on public.live_presence for select using (true);
 
 -- 4. INSERT BASE DATA
-INSERT INTO public.current_holder (id, current_price, replaced_at, custom_message, website_url, website_name, website_logo, views_count, clicks_count)
+INSERT INTO public.current_holder (id, current_price, replaced_at, custom_message, website_url, website_name, website_logo, logo_source, views_count, clicks_count)
 VALUES (
   '00000000-0000-0000-0000-000000000000',
   1.00,
@@ -117,6 +119,7 @@ VALUES (
   'replaceme.lol',
   'ReplaceMe',
   '/replaceme-avatar.svg',
+  'fallback',
   0,
   0
 ) ON CONFLICT DO NOTHING;
