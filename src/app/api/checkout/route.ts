@@ -7,25 +7,18 @@ export async function POST(req: Request) {
     const supabase = await createClient()
 
     const body = await req.json()
-    const { website_url, website_name, website_logo, custom_message, logo_source } = body
+    const { website_url, website_name, website_logo, custom_message, logo_source, bid_amount } = body
 
     if (!website_url) {
       return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
     }
 
-    // 1. Fetch current price
-    const { data: holder, error: holderError } = await supabase
-      .from('current_holder')
-      .select('current_price')
-      .single()
-
-    if (holderError || !holder) {
-      return NextResponse.json({ error: 'Failed to fetch current price' }, { status: 500 })
+    if (!bid_amount || isNaN(Number(bid_amount)) || Number(bid_amount) <= 0) {
+      return NextResponse.json({ error: 'Valid bid amount is required' }, { status: 400 })
     }
 
-    const currentPrice = Number(holder.current_price)
-    // Convert to cents for Dodo Payments (multiply by 100)
-    const amountInCents = Math.round(currentPrice * 100)
+    // Convert bid to cents for Dodo Payments (multiply by 100)
+    const amountInCents = Math.round(Number(bid_amount) * 100)
 
     // 2. Initialize Dodo Payments
     const apiKey = process.env.DODO_PAYMENTS_API_KEY
@@ -64,7 +57,7 @@ export async function POST(req: Request) {
         website_logo: website_logo || '',
         logo_source: logo_source || 'fallback',
         custom_message: custom_message || '',
-        quoted_price: currentPrice.toString(),
+        quoted_price: Number(bid_amount).toString(),
         quote_created_at: new Date().toISOString(),
       },
       return_url: `${appUrl}/checkout/success?payment_id=${paymentId}`,

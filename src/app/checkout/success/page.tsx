@@ -45,53 +45,6 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
     )
   }
 
-  if (['refund_pending', 'refunded', 'refund_failed'].includes(paymentRecord.status) || (paymentRecord.status === 'failed' && paymentRecord.metadata?.reason === 'stale_price')) {
-    
-    const refundNum = Number(paymentRecord.amount)
-    const refundAmount = Number.isFinite(refundNum) ? refundNum.toFixed(2) : '—'
-    
-    const requiredNum = Number(paymentRecord.metadata?.required_price)
-    const requiredPrice = Number.isFinite(requiredNum) ? requiredNum.toFixed(2) : '—'
-
-    let refundText = Number.isFinite(refundNum) 
-      ? `Your payment for $${refundAmount} was not processed for the #1 spot.`
-      : "Your payment was not processed for the #1 spot."
-      
-    if (paymentRecord.status === 'refund_pending') {
-      refundText = Number.isFinite(refundNum) 
-        ? `Your payment for $${refundAmount} is being reviewed for refund.`
-        : "Your payment is being reviewed for refund."
-    } else if (paymentRecord.status === 'refunded') {
-      refundText = Number.isFinite(refundNum) 
-        ? `Your payment for $${refundAmount} was successfully refunded.`
-        : "Your payment was successfully refunded."
-    } else if (paymentRecord.status === 'refund_failed') {
-      refundText = Number.isFinite(refundNum) 
-        ? `Your payment for $${refundAmount} could not be automatically refunded. Please contact support.`
-        : "Your payment could not be automatically refunded. Please contact support."
-    }
-
-    return (
-      <div className="text-center animate-in zoom-in-95 duration-300">
-        <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-red-200 dark:border-red-700/50">
-          💀
-        </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-4 uppercase">
-          TOO LATE.
-        </h1>
-        <p className="text-lg text-[var(--secondary)] font-medium mb-8">
-          Someone else claimed #1 right before you. The new price is <span className="font-bold text-[var(--foreground)]">${requiredPrice}</span>.
-        </p>
-        <div className="space-y-4">
-          <p className="text-sm font-bold text-[var(--accent)]">{refundText}</p>
-          <Link href="/?checkout=true" className="inline-flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] px-8 py-3 rounded-full font-bold text-sm hover:opacity-90 transition-opacity w-full sm:w-auto uppercase tracking-wide">
-            REPLACE THE NEW #1
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   if (paymentRecord.status === 'succeeded') {
     const amountNum = Number(paymentRecord.amount)
     const amountPaid = Number.isFinite(amountNum) ? `$${amountNum.toFixed(2)}` : '—'
@@ -103,23 +56,41 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
       .eq('id', paymentRecord.replacement_id)
       .single()
 
+    // Calculate final rank
+    let rank = 1
+    if (Number.isFinite(amountNum)) {
+      const { count } = await supabase
+        .from('replacements')
+        .select('*', { count: 'exact', head: true })
+        .gt('amount_paid', amountNum)
+      
+      if (count !== null) {
+        rank = count + 1
+      }
+    }
+
     const websiteName = replacement?.new_website_name || 'Your Website'
     const customMessage = replacement?.custom_message || ''
 
-    const shareText = encodeURIComponent(`I'm #1 on ReplaceMe 👑\n\n${websiteName} is getting attention right now.\n\nreplaceme.lol`)
+    const shareText = encodeURIComponent(`I just joined the ranking on ReplaceMe at #${rank} 👑\n\n${websiteName} is live.\n\nreplaceme.lol`)
     const shareUrl = `https://twitter.com/intent/tweet?text=${shareText}`
+
+    const isNumberOne = rank === 1
 
     return (
       <div className="text-center animate-in zoom-in-95 duration-300">
-        <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-yellow-200 dark:border-yellow-700/50">
-          👑
+        <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border ${isNumberOne ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 border-yellow-200 dark:border-yellow-700/50' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 border-gray-200 dark:border-gray-700'}`}>
+          {isNumberOne ? '👑' : '🎉'}
         </div>
         <h1 className="text-[12px] font-bold text-[var(--muted)] uppercase tracking-[0.1em] mb-2">
-          YOU&apos;RE #1
+          {isNumberOne ? "YOU'RE #1" : "YOU'RE ON THE BOARD"}
         </h1>
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-          {websiteName}
+        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)] mb-2">
+          #{rank}
         </h2>
+        <div className="text-xl font-bold text-[var(--secondary)] mb-2">
+          {websiteName}
+        </div>
         {customMessage && (
           <p className="text-lg text-[var(--foreground)] font-medium mb-6 italic">
             &quot;{customMessage}&quot;
@@ -141,11 +112,11 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full bg-[var(--foreground)] text-[var(--background)] px-6 py-3.5 rounded-[12px] font-bold text-[15px] hover:opacity-90 transition-opacity shadow-md"
           >
-            <Share className="w-4 h-4" /> Share your reign
+            <Share className="w-4 h-4" /> Share your rank
           </a>
           
           <Link href="/" className="inline-flex items-center justify-center gap-2 w-full text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors py-2">
-            <ArrowLeft className="w-4 h-4" /> Return to homepage
+            <ArrowLeft className="w-4 h-4" /> Return to leaderboard
           </Link>
         </div>
       </div>
@@ -154,9 +125,15 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
   // Fallback for failed or unknown status
   return (
-    <div className="text-center">
-      <h2 className="text-xl font-bold mb-2 text-[var(--foreground)]">Payment Status: {paymentRecord.status}</h2>
-      <Link href="/" className="text-[var(--accent)] hover:underline mt-4 inline-block">Return Home</Link>
+    <div className="text-center animate-in zoom-in-95 duration-300">
+      <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-red-200 dark:border-red-700/50">
+        ⚠️
+      </div>
+      <h2 className="text-xl font-bold mb-2 text-[var(--foreground)] uppercase">Payment Status: {paymentRecord.status}</h2>
+      <p className="text-sm text-[var(--secondary)] mb-6">Something went wrong or the payment failed.</p>
+      <Link href="/" className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
+        Return Home
+      </Link>
     </div>
   )
 }

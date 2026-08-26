@@ -6,19 +6,19 @@ import { X, AlertCircle } from 'lucide-react'
 interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
-  currentPrice: number
-  currentWebsite: string
+  leaderboard: any[]
   prefilledData?: {
     websiteUrl: string
     message: string
   }
 }
 
-export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, prefilledData }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, leaderboard, prefilledData }: CheckoutModalProps) {
   
   // Form State
   const [websiteInput, setWebsiteInput] = useState('')
   const [customMessage, setCustomMessage] = useState('')
+  const [bidAmount, setBidAmount] = useState<string>('2.00')
   
   // Derived Identity
   const [domain, setDomain] = useState('')
@@ -34,9 +34,22 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
       setWebsiteInput(prefilledData.websiteUrl)
       setCustomMessage(prefilledData.message)
     } else {
-      setCustomMessage(`I just paid $${currentPrice.toFixed(2)} to take #1.`)
+      setCustomMessage(`I just bid to join the ranking.`)
     }
-  }, [isOpen, prefilledData, currentPrice])
+  }, [isOpen, prefilledData])
+
+  // Calculate estimated rank
+  const estimatedRank = (() => {
+    const amount = Number(bidAmount)
+    if (isNaN(amount) || amount <= 0) return null
+    let rank = 1
+    for (const participant of leaderboard) {
+      if (Number(participant.amount_paid) >= amount) {
+        rank++
+      }
+    }
+    return rank
+  })()
 
   useEffect(() => {
     let active = true
@@ -115,6 +128,13 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
       return
     }
 
+    const amountNum = Number(bidAmount)
+    if (isNaN(amountNum) || amountNum < 1.00) {
+      setPaymentError('Minimum bid is $1.00')
+      setPaymentLoading(false)
+      return
+    }
+
     try {
       const payload = {
         website_url: domain,
@@ -122,6 +142,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
         website_logo: logoUrl,
         logo_source: logoSource,
         custom_message: customMessage,
+        bid_amount: amountNum.toFixed(2)
       }
 
       const endpoint = isDemo ? '/api/checkout/demo' : '/api/checkout'
@@ -164,10 +185,10 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
         <div className="flex-1 p-8 md:p-10 border-b lg:border-b-0 lg:border-r border-[var(--border-soft)]">
           <div className="mb-8">
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2 uppercase">
-              You&apos;re replacing {currentWebsite}
+              Join the Ranking
             </h2>
             <p className="text-gray-500 text-sm">
-              Claim the #1 spot for <span className="font-semibold text-[var(--foreground)]">${currentPrice.toFixed(2)}</span>.
+              Bid any amount to enter the leaderboard. Minimum $1.00.
             </p>
           </div>
 
@@ -196,6 +217,20 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
                 className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)] resize-none"
               />
             </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bid Amount ($)</label>
+              <input
+                type="number"
+                min="1.00"
+                step="1.00"
+                required
+                placeholder="2.00"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            </div>
             
             {paymentError && (
               <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm border border-red-100 dark:border-red-800">
@@ -207,16 +242,16 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
             <div className="pt-4 mt-2 space-y-3">
               <button
                 onClick={() => handlePayment(false)}
-                disabled={paymentLoading || !domain || !customMessage}
+                disabled={paymentLoading || !domain || !customMessage || !bidAmount}
                 className="w-full bg-[var(--accent)] text-white py-3.5 rounded-xl font-bold text-base hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-sm uppercase tracking-wide"
               >
-                {paymentLoading ? 'Processing...' : `CLAIM #1 FOR $${currentPrice.toFixed(2)}`}
+                {paymentLoading ? 'Processing...' : `JOIN FOR $${Number(bidAmount) ? Number(bidAmount).toFixed(2) : '0.00'}`}
               </button>
               
               {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
                 <button
                   onClick={() => handlePayment(true)}
-                  disabled={paymentLoading || !domain || !customMessage}
+                  disabled={paymentLoading || !domain || !customMessage || !bidAmount}
                   className="w-full flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] py-3 rounded-xl font-semibold text-sm hover:bg-[var(--border-soft)] transition-colors disabled:opacity-50"
                 >
                    Simulate Demo Payment
@@ -233,7 +268,9 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
           <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 shadow-sm relative">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-lg">👑</span>
-              <span className="text-xs font-bold uppercase tracking-widest text-gray-500">#1</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                {estimatedRank ? `#${estimatedRank} ESTIMATED` : 'RANK'}
+              </span>
             </div>
 
             <div className="flex items-center gap-4 mb-4">
@@ -263,8 +300,10 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, p
             </div>
           </div>
           
-          <div className="mt-8 text-center">
-             <h3 className="text-lg font-semibold text-[var(--foreground)]">You will replace {currentWebsite}.</h3>
+          <div className="mt-8 text-center text-sm text-[var(--secondary)] font-medium">
+             <p>Estimated rank based on current bids.</p>
+             <p>Your final rank is confirmed after payment.</p>
+             <p className="mt-2 text-xs text-gray-400">Applicable taxes may be added by Dodo where required.</p>
           </div>
         </div>
 
