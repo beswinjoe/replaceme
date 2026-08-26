@@ -91,7 +91,7 @@ export function Header() {
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-[var(--surface)] border border-[var(--border)] rounded-[14px] shadow-[0_4px_12px_rgba(0,0,0,0.05)] z-50 py-1">
                     <Link
-                      href={`/profile/${profile.username}`}
+                      href={`/@${profile.username}`}
                       onClick={() => setDropdownOpen(false)}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-[14px] font-medium text-[var(--foreground)] hover:bg-[var(--background)] transition-colors"
                     >
@@ -167,7 +167,7 @@ export function Header() {
           {user && profile ? (
             <div className="pt-4 border-t border-[var(--border)] space-y-3">
               <Link
-                href={`/profile/${profile.username}`}
+                href={`/@${profile.username}`}
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 py-2 text-[var(--foreground)]"
               >

@@ -64,6 +64,8 @@ export async function POST(req: Request) {
         avatar_url: avatar_url || '',
         custom_message: custom_message || '',
         website_url: website_url || '',
+        quoted_price: currentPrice.toString(),
+        quote_created_at: new Date().toISOString(),
       },
       return_url: `${appUrl}/checkout/success?session_id={session_id}`,
     })

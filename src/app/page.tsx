@@ -557,8 +557,8 @@ function HomeContent() {
   const holderUsername = isInitialState ? 'replaceme' : (holderUser?.username || 'replaceme');
   const holderDisplayName = isInitialState ? 'ReplaceMe' : (holderUser?.display_name || holderUsername);
   const holderAvatar = isInitialState 
-    ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=replaceme' 
-    : (holderUser?.avatar_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback');
+    ? '/replaceme-avatar.svg' 
+    : (holderUser?.avatar_url || '');
   const holderMessage = isInitialState ? 'Someone has to be first.' : (currentHolder?.custom_message || 'I am the reigning #1.');
 
   return (

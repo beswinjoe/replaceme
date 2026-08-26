@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const currentPrice = Number(holder.current_price)
 
-    // 2. Initialize Supabase Admin to execute profile update & replace_holder
+    // 2. Initialize Supabase Admin to execute profile update & replacement
     const supabaseAdmin = createAdminClient()
 
     // Update user profile details
@@ -50,38 +50,24 @@ export async function POST(req: Request) {
       }
     }
 
+    const sessionId = `demo_${Math.random().toString(36).substring(7)}`
+
     // Call atomic replacement function
     const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
-      'replace_holder',
+      'process_payment_and_replace',
       {
+        p_payment_id: sessionId,
         p_new_user_id: user.id,
         p_amount_paid: currentPrice,
         p_custom_message: custom_message || null,
-        p_website_url: website_url || null
+        p_website_url: website_url || null,
+        p_metadata: body
       }
     )
 
     if (replaceError) {
       console.error('Atomic replacement failed in demo:', replaceError)
       return NextResponse.json({ error: replaceError.message }, { status: 500 })
-    }
-
-    const sessionId = `demo_${Math.random().toString(36).substring(7)}`
-
-    // Log payment in public.payments table
-    const { error: paymentError } = await supabaseAdmin
-      .from('payments')
-      .insert({
-        user_id: user.id,
-        dodo_payment_id: sessionId,
-        amount: currentPrice,
-        status: 'succeeded',
-        replacement_id: replaceData?.replacement_id || null,
-        metadata: body
-      })
-
-    if (paymentError) {
-      console.error('Failed to log payment in demo checkout:', paymentError)
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'

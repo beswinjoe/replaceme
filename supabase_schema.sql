@@ -176,8 +176,8 @@ insert into public.users (id, username, display_name, avatar_url, bio, website_u
 values (
   '00000000-0000-0000-0000-000000000000'::uuid,
   'replaceme',
-  'ReplaceMe System',
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60',
+  'ReplaceMe',
+  '/replaceme-avatar.svg',
   'Someone has to be first. Replace me to start the game.',
   'https://replaceme.lol'
 ) on conflict (id) do nothing;
@@ -332,7 +332,7 @@ begin
       'achievement', 
       '👶 ACHIEVEMENT UNLOCKED: FIRST BLOOD', 
       'You became #1 for the first time!', 
-      concat('/profile/', coalesce(v_new_username, ''))
+      concat('/@', coalesce(v_new_username, ''))
     );
   end if;
 
@@ -355,7 +355,7 @@ begin
       'achievement', 
       '🔁 ACHIEVEMENT UNLOCKED: REVENGE', 
       concat('You took back #1 from @', coalesce(v_prev_username, 'someone'), '!'), 
-      concat('/profile/', coalesce(v_new_username, ''))
+      concat('/@', coalesce(v_new_username, ''))
     );
   end if;
 
@@ -372,7 +372,7 @@ begin
         'achievement', 
         '💀 ACHIEVEMENT UNLOCKED: SERIAL REPLACER', 
         'You have replaced 10 people!', 
-        concat('/profile/', coalesce(v_new_username, ''))
+        concat('/@', coalesce(v_new_username, ''))
       );
     end if;
   end if;
@@ -391,7 +391,7 @@ begin
           'achievement', 
           '😭 ACHIEVEMENT UNLOCKED: UNEMPLOYED', 
           'You got replaced 10 times! Get some help...', 
-          concat('/profile/', coalesce(v_prev_username, ''))
+          concat('/@', coalesce(v_prev_username, ''))
         );
       end if;
     end if;
@@ -410,7 +410,7 @@ begin
         'achievement', 
         '💸 ACHIEVEMENT UNLOCKED: BIG SPENDER', 
         'You have spent over $100 becoming #1!', 
-        concat('/profile/', coalesce(v_new_username, ''))
+        concat('/@', coalesce(v_new_username, ''))
       );
     end if;
   end if;
@@ -428,7 +428,7 @@ begin
         'achievement', 
         '👑 ACHIEVEMENT UNLOCKED: UNTOUCHABLE', 
         'You held #1 for over 24 hours!', 
-        concat('/profile/', coalesce(v_prev_username, ''))
+        concat('/@', coalesce(v_prev_username, ''))
       );
     end if;
   end if;
@@ -446,7 +446,7 @@ begin
         'achievement', 
         '🔥 ACHIEVEMENT UNLOCKED: INTERNET MENACE', 
         concat('You replaced @', coalesce(v_prev_username, 'someone'), ' 3 times. Savage.'), 
-        concat('/profile/', coalesce(v_new_username, ''))
+        concat('/@', coalesce(v_new_username, ''))
       );
     end if;
   end if;
@@ -470,6 +470,10 @@ begin
   );
 
   return v_response;
+exception
+  when unique_violation then
+    -- A concurrent webhook successfully inserted this payment already
+    return json_build_object('status', 'already_processed');
 end;
 $$ language plpgsql security definer;
 

@@ -5,6 +5,7 @@ import { Header } from '@/components/Header'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { Crown, Skull, DollarSign, Swords, Flame } from 'lucide-react'
+import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 type LeaderboardTab = 'reign' | 'replacements' | 'spenders' | 'replaced' | 'biggest'
 
@@ -289,12 +290,19 @@ export default function LeaderboardPage() {
                         </span>
                       </div>
                       
-                      <Link href={`/profile/${item.username}`} className="flex items-center gap-3">
-                        <img
-                          src={item.avatarUrl || 'https://api.dicebear.com/7.x/pixel-art/svg?seed=fallback'}
-                          alt={item.username}
-                          className="h-10 w-10 rounded-full border border-[var(--border-soft)] object-cover bg-gray-100 dark:bg-gray-800"
-                        />
+                      <Link href={`/@${item.username}`} className="flex items-center gap-3">
+                        {item.avatarUrl ? (
+                          <img
+                            src={item.avatarUrl}
+                            alt={item.username}
+                            className="w-12 h-12 rounded-full object-cover border border-[var(--border-soft)] shadow-sm bg-[var(--surface)]"
+                          />
+                        ) : (
+                          <InitialsAvatar
+                            name={item.displayName || item.username}
+                            className="w-12 h-12 text-sm border border-[var(--border-soft)] shadow-sm"
+                          />
+                        )}
                         <div>
                           <p className="font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
                             {item.displayName}

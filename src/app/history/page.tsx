@@ -5,6 +5,7 @@ import { Header } from '@/components/Header'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { ExternalLink, Clock } from 'lucide-react'
+import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 export default function HistoryPage() {
   const supabase = createClient()
@@ -118,13 +119,17 @@ export default function HistoryPage() {
                   
                   {/* Timeline Dot */}
                   <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-[var(--background)] bg-[var(--surface)] text-gray-400 group-hover:text-[var(--accent)] group-hover:border-[var(--accent)] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm transition-colors z-10 overflow-hidden">
-                     <img src={newUser?.avatar_url || 'https://api.dicebear.com/7.x/pixel-art/svg?seed=fallback'} alt="avatar" className="w-full h-full object-cover" />
+                    {newUser?.avatar_url ? (
+                      <img src={newUser.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <InitialsAvatar name={newUser?.display_name || newUser?.username || 'Y N'} className="w-full h-full text-xl" />
+                    )}
                   </div>
 
                   <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-5 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <Link href={`/profile/${newUser?.username}`} className="font-bold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
+                        <Link href={`/@${newUser?.username}`} className="font-bold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
                           @{newUser?.username || 'someone'}
                         </Link>
                       </div>
@@ -135,7 +140,7 @@ export default function HistoryPage() {
 
                     <div className="text-sm text-gray-500 font-medium mb-3">
                       Replaced {isFirstUser ? 'the official account' : (
-                        <Link href={`/profile/${previousUser?.username}`} className="text-[var(--foreground)] hover:text-[var(--accent)] transition-colors font-semibold">
+                        <Link href={`/@${previousUser?.username}`} className="text-[var(--foreground)] hover:text-[var(--accent)] transition-colors font-semibold">
                           @{previousUser?.username}
                         </Link>
                       )}

@@ -40,13 +40,16 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
   if (['refund_pending', 'refunded', 'refund_failed'].includes(paymentRecord.status) || (paymentRecord.status === 'failed' && paymentRecord.metadata?.reason === 'stale_price')) {
     
-    let refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " was not processed for the #1 spot."
+    const refundAmount = Number(paymentRecord.amount ?? 0).toFixed(2)
+    const requiredPrice = Number(paymentRecord.metadata?.required_price ?? 0).toFixed(2)
+
+    let refundText = "Your payment for $" + refundAmount + " was not processed for the #1 spot."
     if (paymentRecord.status === 'refund_pending') {
-      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " is being reviewed for refund."
+      refundText = "Your payment for $" + refundAmount + " is being reviewed for refund."
     } else if (paymentRecord.status === 'refunded') {
-      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " was successfully refunded."
+      refundText = "Your payment for $" + refundAmount + " was successfully refunded."
     } else if (paymentRecord.status === 'refund_failed') {
-      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " could not be automatically refunded. Please contact support."
+      refundText = "Your payment for $" + refundAmount + " could not be automatically refunded. Please contact support."
     }
 
     return (
@@ -58,7 +61,7 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
           TOO LATE.
         </h1>
         <p className="text-lg text-[var(--secondary)] font-medium mb-8">
-          Someone else claimed #1 right before you. The new price is <span className="font-bold text-[var(--foreground)]">${paymentRecord.metadata.required_price?.toFixed(2)}</span>.
+          Someone else claimed #1 right before you. The new price is <span className="font-bold text-[var(--foreground)]">${requiredPrice}</span>.
         </p>
         <div className="space-y-4">
           <p className="text-sm font-bold text-[var(--accent)]">{refundText}</p>
@@ -71,6 +74,8 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
   }
 
   if (paymentRecord.status === 'succeeded') {
+    const amountPaid = Number(paymentRecord.amount ?? 0).toFixed(2)
+    
     return (
       <div className="text-center animate-in zoom-in-95 duration-300">
         <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-yellow-200 dark:border-yellow-700/50">
@@ -85,7 +90,7 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
         <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6 mb-8 text-center space-y-2 max-w-sm mx-auto">
            <p className="text-sm font-medium text-[var(--muted)] uppercase tracking-wide">You paid</p>
-           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">${paymentRecord.amount.toFixed(2)}</p>
+           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">${amountPaid}</p>
         </div>
 
         <div className="space-y-6">

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Globe, Clock } from 'lucide-react'
 
+import { isValidUsername } from '@/utils/validation'
+
 interface ProfilePageProps {
   params: Promise<{ username: string }>
 }
@@ -25,14 +27,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const decoded = decodeURIComponent(rawUsername)
   const username = decoded.startsWith('@') ? decoded.slice(1) : decoded
 
-  // Strict route protection
-  const RESERVED_ROUTES = [
-    'history', 'leaderboard', 'checkout', 'api', 'auth',
-    'login', 'notifications', 'profile', 'settings',
-    'favicon.ico', 'robots.txt', 'sitemap.xml', '_next'
-  ]
-  
-  if (RESERVED_ROUTES.includes(username.toLowerCase()) || !username.match(/^[a-zA-Z0-9_]{3,15}$/)) {
+  if (!isValidUsername(username)) {
     notFound()
   }
 

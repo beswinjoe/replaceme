@@ -161,8 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             username,
             display_name: displayName,
-            avatar_url: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${randomId}`,
-            bio: 'Loves taking spot #1. Watch out!',
             website_url: 'https://replaceme.lol',
           },
         },

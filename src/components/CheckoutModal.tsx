@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { createClient } from '@/utils/supabase/client'
 import { X, Sparkles, AlertCircle, RefreshCcw, Share } from 'lucide-react'
+import { isValidUsername } from '@/utils/validation'
+import { InitialsAvatar } from '@/components/InitialsAvatar'
 import confetti from 'canvas-confetti'
 
 interface CheckoutModalProps {
@@ -44,7 +45,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
       
       setUsername(prefilledData?.username || profile?.username || '')
       setDisplayName(profile?.display_name || '')
-      setAvatarUrl(profile?.avatar_url || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${Math.random()}`)
+      setAvatarUrl(profile?.avatar_url || '')
       setWebsiteUrl(prefilledData?.link || profile?.website_url || '')
       setCustomMessage(prefilledData?.message || `I just paid $${currentPrice.toFixed(2)} to take #1.`)
     } else {
@@ -90,20 +91,14 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
     }
   }
 
-  // Avatar Randomizer
-  const randomizeAvatar = () => {
-    const randomStyle = AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)]
-    const randomSeed = Math.random().toString(36).substring(7)
-    setAvatarUrl(`https://api.dicebear.com/7.x/${randomStyle}/svg?seed=${randomSeed}`)
-  }
 
   // Pay/Simulate Handler
   const handlePayment = async (isDemo: boolean = false) => {
     setPaymentLoading(true)
     setPaymentError(null)
 
-    if (!username.match(/^[a-zA-Z0-9_]{3,15}$/)) {
-      setPaymentError('Username must be 3-15 alphanumeric characters.')
+    if (!isValidUsername(username)) {
+      setPaymentError('Username must be 3-15 alphanumeric characters and not a reserved route.')
       setPaymentLoading(false)
       return
     }
@@ -282,13 +277,6 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
                   />
                 </div>
                 
-                <div className="pt-2 flex items-center justify-between">
-                   <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                     <button onClick={randomizeAvatar} type="button" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-soft)] hover:bg-[var(--surface-elevated)] transition-colors">
-                        <RefreshCcw className="w-3 h-3" /> Roll Avatar
-                     </button>
-                   </div>
-                </div>
 
                 {paymentError && (
                   <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm border border-red-100 dark:border-red-800">
@@ -332,11 +320,18 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
             </div>
 
             <div className="flex items-center gap-4 mb-4">
-              <img
-                src={avatarUrl || 'https://api.dicebear.com/7.x/pixel-art/svg?seed=preview'}
-                alt="preview avatar"
-                className="w-12 h-12 rounded-full border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-cover"
-              />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="preview avatar"
+                  className="w-12 h-12 rounded-full border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-cover"
+                />
+              ) : (
+                <InitialsAvatar
+                  name={displayName || username || 'Y N'}
+                  className="w-12 h-12 text-sm border border-[var(--border-soft)]"
+                />
+              )}
               <div>
                 <h4 className="font-bold text-[var(--foreground)] truncate max-w-[160px]">
                   {displayName || 'Your Name'}
