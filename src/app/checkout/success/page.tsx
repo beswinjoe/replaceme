@@ -3,9 +3,9 @@ import { createClient } from '@/utils/supabase/server'
 import { Share, ArrowLeft, RefreshCcw } from 'lucide-react'
 import Link from 'next/link'
 
-interface SuccessPageProps {
-  searchParams: Promise<{ session_id?: string }>
-}
+import { cookies } from 'next/headers'
+
+interface SuccessPageProps {}
 
 async function PaymentStatus({ sessionId }: { sessionId: string }) {
   const supabase = await createClient()
@@ -161,8 +161,9 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
   )
 }
 
-export default async function CheckoutSuccessPage({ searchParams }: SuccessPageProps) {
-  const { session_id } = await searchParams
+export default async function CheckoutSuccessPage() {
+  const cookieStore = await cookies()
+  const session_id = cookieStore.get('dodo_session_id')?.value
 
   if (!session_id) {
     return (

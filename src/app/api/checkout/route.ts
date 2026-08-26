@@ -63,10 +63,13 @@ export async function POST(req: Request) {
         quoted_price: currentPrice.toString(),
         quote_created_at: new Date().toISOString(),
       },
-      return_url: `${appUrl}/checkout/success?session_id={session_id}`,
+      return_url: `${appUrl}/checkout/success`,
     })
 
-    return NextResponse.json({ url: session.checkout_url, sessionId: session.session_id })
+    const response = NextResponse.json({ url: session.checkout_url, sessionId: session.session_id })
+    response.cookies.set('dodo_session_id', session.session_id, { maxAge: 60 * 15 }) // 15 mins
+    
+    return response
   } catch (error: any) {
     console.error('Checkout error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
