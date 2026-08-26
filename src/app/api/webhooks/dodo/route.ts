@@ -86,13 +86,16 @@ export async function POST(req: Request) {
       }
 
       // 2. Call the atomic database replacement transaction
+      const paymentId = data.payment_id || data.transaction_id || data.session_id || 'unknown'
       const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
-        'replace_holder',
+        'process_payment_and_replace',
         {
+          p_payment_id: paymentId,
           p_new_user_id: userId,
           p_amount_paid: amountPaid,
           p_custom_message: customMessage || null,
-          p_website_url: websiteUrl || null
+          p_website_url: websiteUrl || null,
+          p_metadata: metadata
         }
       )
 
@@ -101,23 +104,56 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Atomic replacement failed' }, { status: 500 })
       }
 
-      // 3. Log payment success in payments table
-      const { error: paymentError } = await supabaseAdmin
-        .from('payments')
-        .insert({
-          user_id: userId,
-          dodo_payment_id: data.payment_id || data.transaction_id || data.session_id || 'unknown',
-          amount: amountPaid,
-          status: 'succeeded',
-          replacement_id: replaceData?.replacement_id || null,
-          metadata: metadata
-        })
+      if (replaceData?.status === 'already_processed') {
+        console.log(`Payment ${paymentId} already processed (idempotent success).`)
+        return NextResponse.json({ success: true, status: 'already_processed' })
+      }
 
-      if (paymentError) {
-        console.error('Failed to log payment in webhook:', paymentError)
+      if (replaceData?.status === 'stale_price') {
+        console.warn(`Stale price race condition: User paid ${amountPaid} but ${replaceData.required_price} was required.`)
+        
+        // 3. Initiate Dodo Refund
+        try {
+          const refund = await dodo.refunds.create({
+            payment_id: paymentId,
+            reason: 'Stale price checkout race condition. User did not secure #1.',
+          })
+          
+          if (refund.status) {
+            await supabaseAdmin.from('payments')
+              .update({ 
+                status: 'refund_pending',
+                metadata: { ...metadata, reason: 'stale_price', required_price: replaceData.required_price, refund_id: refund.refund_id }
+              })
+              .eq('dodo_payment_id', paymentId)
+          }
+        } catch (refundError: any) {
+          console.error('Failed to automatically issue refund:', refundError.message)
+          // Status remains 'refund_pending' in DB as inserted by RPC so admin can resolve manually
+        }
+
+        return NextResponse.json({ success: true, status: 'stale_price' })
       }
 
       console.log('Successfully replaced holder via webhook. New price:', replaceData?.new_price)
+    } else if (payload?.type === 'refund.succeeded') {
+      const data = payload.data
+      if (data && data.payment_id) {
+        const supabaseAdmin = createAdminClient()
+        await supabaseAdmin.from('payments')
+          .update({ status: 'refunded' })
+          .eq('dodo_payment_id', data.payment_id)
+        console.log(`Refund succeeded for payment ${data.payment_id}`)
+      }
+    } else if (payload?.type === 'refund.failed') {
+      const data = payload.data
+      if (data && data.payment_id) {
+        const supabaseAdmin = createAdminClient()
+        await supabaseAdmin.from('payments')
+          .update({ status: 'refund_failed' })
+          .eq('dodo_payment_id', data.payment_id)
+        console.log(`Refund failed for payment ${data.payment_id}`)
+      }
     }
 
     return NextResponse.json({ success: true })

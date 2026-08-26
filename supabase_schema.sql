@@ -79,11 +79,15 @@ create table public.payments (
   user_id uuid references public.users(id) not null,
   dodo_payment_id text unique not null,
   amount numeric(12, 2) not null,
-  status text not null check (status in ('pending', 'succeeded', 'failed')),
+  status text not null,
   replacement_id uuid references public.replacements(id),
   metadata jsonb,
   created_at timestamptz default now() not null
 );
+
+-- Safely apply status constraint for migrations
+alter table public.payments drop constraint if exists payments_status_check;
+alter table public.payments add constraint payments_status_check check (status in ('pending', 'processing', 'succeeded', 'failed', 'refund_pending', 'refunded', 'refund_failed'));
 
 -- Enable RLS for payments
 alter table public.payments enable row level security;
@@ -201,12 +205,14 @@ insert into public.achievements (id, name, description, icon) values
 on conflict (id) do nothing;
 
 
--- 9. ATOMIC REPLACEMENT STORED PROCEDURE
-create or replace function public.replace_holder(
+-- 9. ATOMIC REPLACEMENT AND PAYMENT PROCESSING
+create or replace function public.process_payment_and_replace(
+  p_payment_id text,
   p_new_user_id uuid,
   p_amount_paid numeric,
   p_custom_message text,
-  p_website_url text
+  p_website_url text,
+  p_metadata jsonb
 ) returns json as $$
 declare
   v_prev_user_id uuid;
@@ -220,16 +226,35 @@ declare
   v_replacement_id uuid;
   v_response json;
 begin
-  -- Lock current_holder for update to prevent concurrent updates
+  -- 1. Idempotency Check: if payment already processed, safely return
+  if exists (select 1 from public.payments where dodo_payment_id = p_payment_id) then
+    return json_build_object('status', 'already_processed');
+  end if;
+
+  -- 2. Lock current_holder for update to prevent concurrent updates
   select user_id, current_price, replaced_at
   into v_prev_user_id, v_current_price, v_replaced_at
   from public.current_holder
   where id = '00000000-0000-0000-0000-000000000000'::uuid
   for update;
 
-  -- Verify payment amount matches/exceeds current price
+  -- 3. Verify payment amount matches/exceeds current price (Stale Price Check)
   if p_amount_paid < v_current_price then
-    raise exception 'Insufficient payment. Required: %, Paid: %', v_current_price, p_amount_paid;
+    -- Atomically log the payment as refund_pending to block retries and prep for refund
+    insert into public.payments (user_id, dodo_payment_id, amount, status, metadata)
+    values (
+      p_new_user_id, 
+      p_payment_id, 
+      p_amount_paid, 
+      'refund_pending', 
+      p_metadata || jsonb_build_object('reason', 'stale_price', 'required_price', v_current_price)
+    );
+
+    return json_build_object(
+      'status', 'stale_price',
+      'required_price', v_current_price,
+      'amount_paid', p_amount_paid
+    );
   end if;
 
   -- Get usernames
@@ -426,6 +451,17 @@ begin
     end if;
   end if;
 
+  -- 8. Insert successful payment record atomically
+  insert into public.payments (user_id, dodo_payment_id, amount, status, replacement_id, metadata)
+  values (
+    p_new_user_id,
+    p_payment_id,
+    p_amount_paid,
+    'succeeded',
+    v_replacement_id,
+    p_metadata
+  );
+
   v_response := json_build_object(
     'success', true,
     'replacement_id', v_replacement_id,
@@ -451,10 +487,7 @@ begin
       substring(new.email from '([^@]+)') || '_' || substring(gen_random_uuid()::text from 1 for 4)
     ),
     coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'name', substring(new.email from '([^@]+)')),
-    coalesce(
-      new.raw_user_meta_data->>'avatar_url', 
-      concat('https://api.dicebear.com/7.x/pixel-art/svg?seed=', new.id::text)
-    ),
+    new.raw_user_meta_data->>'avatar_url',
     coalesce(new.raw_user_meta_data->>'bio', 'Building cool stuff on the internet.'),
     coalesce(new.raw_user_meta_data->>'website_url', '')
   )

@@ -66,12 +66,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: replaceError.message }, { status: 500 })
     }
 
+    const sessionId = `demo_${Math.random().toString(36).substring(7)}`
+
     // Log payment in public.payments table
     const { error: paymentError } = await supabaseAdmin
       .from('payments')
       .insert({
         user_id: user.id,
-        dodo_payment_id: `demo_${Math.random().toString(36).substring(7)}`,
+        dodo_payment_id: sessionId,
         amount: currentPrice,
         status: 'succeeded',
         replacement_id: replaceData?.replacement_id || null,
@@ -82,10 +84,11 @@ export async function POST(req: Request) {
       console.error('Failed to log payment in demo checkout:', paymentError)
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
     return NextResponse.json({
-      success: true,
-      replacementId: replaceData?.replacement_id,
-      newPrice: replaceData?.new_price,
+      url: `${appUrl}/checkout/success?session_id=${sessionId}`,
+      sessionId: sessionId,
     })
   } catch (error: any) {
     console.error('Demo checkout error:', error)

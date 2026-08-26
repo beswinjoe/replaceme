@@ -1,0 +1,132 @@
+import { Suspense } from 'react'
+import { createClient } from '@/utils/supabase/server'
+import { Share, ArrowLeft, RefreshCcw } from 'lucide-react'
+import Link from 'next/link'
+
+interface SuccessPageProps {
+  searchParams: Promise<{ session_id?: string }>
+}
+
+async function PaymentStatus({ sessionId }: { sessionId: string }) {
+  const supabase = await createClient()
+
+  // Poll database for up to 10 seconds to allow webhook to process
+  let paymentRecord = null
+  for (let i = 0; i < 10; i++) {
+    const { data } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('dodo_payment_id', sessionId)
+      .single()
+    
+    if (data) {
+      paymentRecord = data
+      break
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+
+  if (!paymentRecord) {
+    return (
+      <div className="text-center">
+        <h2 className="text-xl font-bold mb-2 text-[var(--foreground)]">Payment Verification Timed Out</h2>
+        <p className="text-[var(--secondary)] mb-6">We are still waiting for confirmation from the payment provider. Please check back in a few minutes.</p>
+        <Link href={`/checkout/success?session_id=${sessionId}`} className="text-[var(--accent)] font-medium flex items-center justify-center gap-2 mx-auto">
+          <RefreshCcw className="w-4 h-4" /> Refresh Status
+        </Link>
+      </div>
+    )
+  }
+
+  if (['refund_pending', 'refunded', 'refund_failed'].includes(paymentRecord.status) || (paymentRecord.status === 'failed' && paymentRecord.metadata?.reason === 'stale_price')) {
+    
+    let refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " was not processed for the #1 spot."
+    if (paymentRecord.status === 'refund_pending') {
+      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " is being reviewed for refund."
+    } else if (paymentRecord.status === 'refunded') {
+      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " was successfully refunded."
+    } else if (paymentRecord.status === 'refund_failed') {
+      refundText = "Your payment for $" + paymentRecord.amount.toFixed(2) + " could not be automatically refunded. Please contact support."
+    }
+
+    return (
+      <div className="text-center animate-in zoom-in-95 duration-300">
+        <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-red-200 dark:border-red-700/50">
+          💀
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-4 uppercase">
+          TOO LATE.
+        </h1>
+        <p className="text-lg text-[var(--secondary)] font-medium mb-8">
+          Someone else claimed #1 right before you. The new price is <span className="font-bold text-[var(--foreground)]">${paymentRecord.metadata.required_price?.toFixed(2)}</span>.
+        </p>
+        <div className="space-y-4">
+          <p className="text-sm font-bold text-[var(--accent)]">{refundText}</p>
+          <Link href="/?checkout=true" className="inline-flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] px-8 py-3 rounded-full font-bold text-sm hover:opacity-90 transition-opacity w-full sm:w-auto uppercase tracking-wide">
+            REPLACE THE NEW #1
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (paymentRecord.status === 'succeeded') {
+    return (
+      <div className="text-center animate-in zoom-in-95 duration-300">
+        <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-yellow-200 dark:border-yellow-700/50">
+          👑
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
+          You&apos;re #1.
+        </h1>
+        <p className="text-lg text-[var(--secondary)] font-medium mb-8">
+          Your reign has officially started.
+        </p>
+
+        <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6 mb-8 text-center space-y-2 max-w-sm mx-auto">
+           <p className="text-sm font-medium text-[var(--muted)] uppercase tracking-wide">You paid</p>
+           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">${paymentRecord.amount.toFixed(2)}</p>
+        </div>
+
+        <div className="space-y-6">
+          <Link href="/" className="inline-flex items-center gap-2 text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Return to homepage
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Fallback for failed or unknown status
+  return (
+    <div className="text-center">
+      <h2 className="text-xl font-bold mb-2 text-[var(--foreground)]">Payment Status: {paymentRecord.status}</h2>
+      <Link href="/" className="text-[var(--accent)] hover:underline mt-4 inline-block">Return Home</Link>
+    </div>
+  )
+}
+
+export default async function CheckoutSuccessPage({ searchParams }: SuccessPageProps) {
+  const { session_id } = await searchParams
+
+  if (!session_id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] mb-4">Invalid Session</h1>
+          <Link href="/" className="text-[var(--accent)] hover:underline">Return Home</Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
+      <div className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border)] rounded-[24px] p-8 md:p-12 shadow-2xl">
+        <Suspense fallback={<div className="text-center text-[var(--muted)]">Loading payment status...</div>}>
+          <PaymentStatus sessionId={session_id} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}

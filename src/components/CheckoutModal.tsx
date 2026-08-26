@@ -38,13 +38,6 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
-  // Demo Success state
-  const [victoryDetails, setVictoryDetails] = useState<{
-    amountPaid: number
-    previousUser: string
-    newPrice: number
-  } | null>(null)
-
   useEffect(() => {
     if (user) {
       setActiveTab('edit')
@@ -130,46 +123,20 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
     }
 
     try {
-      if (isDemo) {
-        const response = await fetch('/api/checkout/demo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
+      const endpoint = isDemo ? '/api/checkout/demo' : '/api/checkout'
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
 
-        const resData = await response.json()
-        if (!response.ok) throw new Error(resData.error || 'Simulation failed')
+      const resData = await response.json()
+      if (!response.ok) throw new Error(resData.error || 'Checkout session failed')
 
-        // Minimal, elegant confetti
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.5 },
-          colors: ['#2563eb', '#3b82f6', '#60a5fa', '#ffffff'],
-          disableForReducedMotion: true
-        })
-
-        setVictoryDetails({
-          amountPaid: currentPrice,
-          previousUser: currentUsername,
-          newPrice: resData.newPrice,
-        })
-        await refreshProfile()
+      if (resData.url) {
+        window.location.href = resData.url
       } else {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-
-        const resData = await response.json()
-        if (!response.ok) throw new Error(resData.error || 'Checkout session failed')
-
-        if (resData.url) {
-          window.location.href = resData.url
-        } else {
-          throw new Error('No checkout URL returned')
-        }
+        throw new Error('No checkout URL returned')
       }
     } catch (err: any) {
       console.error(err)
@@ -177,72 +144,6 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
     } finally {
       setPaymentLoading(false)
     }
-  }
-
-  const handleShare = () => {
-    if (!profile) return
-    const text = `I just became #1 on ReplaceMe.\n\nWho's replacing me next? 👑\n\nhttps://replaceme.lol`
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank')
-  }
-  
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText('https://replaceme.lol')
-    alert('Link copied!')
-  }
-
-  // SUCCESS STATE
-  if (victoryDetails) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border-soft)] rounded-3xl p-8 md:p-10 text-center shadow-2xl animate-in zoom-in-95 duration-300">
-          <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-yellow-200 dark:border-yellow-700/50">
-            👑
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-            You&apos;re #1.
-          </h1>
-          <p className="text-lg text-gray-500 font-medium mb-8">
-            <span className="font-semibold text-[var(--foreground)]">@{victoryDetails.previousUser}</span> has been replaced.
-          </p>
-
-          <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6 mb-8 text-center space-y-2">
-             <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">You paid</p>
-             <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">${victoryDetails.amountPaid.toFixed(2)}</p>
-             <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-[var(--border-soft)]">Your reign has started.</p>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)] mb-3">Share your victory</p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={handleShare}
-                  className="flex items-center gap-2 bg-[#000000] dark:bg-white text-white dark:text-black px-6 py-2.5 rounded-full font-semibold text-sm hover:opacity-90 transition-opacity"
-                >
-                  <span className="w-4 h-4 text-center leading-none flex items-center justify-center font-bold">X</span> Share on X
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className="flex items-center gap-2 bg-[var(--surface-elevated)] text-[var(--foreground)] border border-[var(--border-soft)] px-6 py-2.5 rounded-full font-semibold text-sm hover:bg-[var(--border-soft)] transition-colors"
-                >
-                  <Share className="w-4 h-4" /> Copy link
-                </button>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => {
-                setVictoryDetails(null)
-                onClose()
-              }}
-              className="text-gray-500 hover:text-[var(--foreground)] font-medium text-sm transition-colors"
-            >
-              Return to leaderboard
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   // CHECKOUT FLOW
