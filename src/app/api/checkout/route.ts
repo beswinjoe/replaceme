@@ -5,14 +5,13 @@ import DodoPayments from 'dodopayments'
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const body = await req.json()
-    const { username, display_name, avatar_url, custom_message, website_url } = body
+    const { website_url, website_name, website_logo, custom_message } = body
+
+    if (!website_url) {
+      return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
+    }
 
     // 1. Fetch current price
     const { data: holder, error: holderError } = await supabase
@@ -54,16 +53,11 @@ export async function POST(req: Request) {
           amount: amountInCents, // PWYW Override
         },
       ],
-      customer: {
-        email: user.email || 'guest@replaceme.lol',
-      },
       metadata: {
-        user_id: user.id,
-        username: username || '',
-        display_name: display_name || '',
-        avatar_url: avatar_url || '',
+        website_url: website_url,
+        website_name: website_name || website_url,
+        website_logo: website_logo || '',
         custom_message: custom_message || '',
-        website_url: website_url || '',
         quoted_price: currentPrice.toString(),
         quote_created_at: new Date().toISOString(),
       },

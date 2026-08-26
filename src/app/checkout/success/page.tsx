@@ -28,10 +28,17 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
   if (!paymentRecord) {
     return (
-      <div className="text-center">
-        <h2 className="text-xl font-bold mb-2 text-[var(--foreground)]">Payment Verification Timed Out</h2>
-        <p className="text-[var(--secondary)] mb-6">We are still waiting for confirmation from the payment provider. Please check back in a few minutes.</p>
-        <Link href={`/checkout/success?session_id=${sessionId}`} className="text-[var(--accent)] font-medium flex items-center justify-center gap-2 mx-auto">
+      <div className="text-center animate-in zoom-in-95 duration-300">
+        <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-sm border border-blue-200 dark:border-blue-700/50">
+          ⏳
+        </div>
+        <h2 className="text-2xl font-bold mb-4 text-[var(--foreground)] uppercase tracking-tight">Payment Is Still Being Verified</h2>
+        <div className="text-[var(--secondary)] mb-8 space-y-2 font-medium">
+          <p className="text-[var(--accent)] font-bold uppercase tracking-wider text-sm">Don&apos;t pay again.</p>
+          <p>Your payment may still be processing on the provider&apos;s end.</p>
+          <p>Refresh this page in a moment to check again.</p>
+        </div>
+        <Link href={`/checkout/success?session_id=${sessionId}`} className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
           <RefreshCcw className="w-4 h-4" /> Refresh Status
         </Link>
       </div>
@@ -40,16 +47,28 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
   if (['refund_pending', 'refunded', 'refund_failed'].includes(paymentRecord.status) || (paymentRecord.status === 'failed' && paymentRecord.metadata?.reason === 'stale_price')) {
     
-    const refundAmount = Number(paymentRecord.amount ?? 0).toFixed(2)
-    const requiredPrice = Number(paymentRecord.metadata?.required_price ?? 0).toFixed(2)
+    const refundNum = Number(paymentRecord.amount)
+    const refundAmount = Number.isFinite(refundNum) ? refundNum.toFixed(2) : '—'
+    
+    const requiredNum = Number(paymentRecord.metadata?.required_price)
+    const requiredPrice = Number.isFinite(requiredNum) ? requiredNum.toFixed(2) : '—'
 
-    let refundText = "Your payment for $" + refundAmount + " was not processed for the #1 spot."
+    let refundText = Number.isFinite(refundNum) 
+      ? `Your payment for $${refundAmount} was not processed for the #1 spot.`
+      : "Your payment was not processed for the #1 spot."
+      
     if (paymentRecord.status === 'refund_pending') {
-      refundText = "Your payment for $" + refundAmount + " is being reviewed for refund."
+      refundText = Number.isFinite(refundNum) 
+        ? `Your payment for $${refundAmount} is being reviewed for refund.`
+        : "Your payment is being reviewed for refund."
     } else if (paymentRecord.status === 'refunded') {
-      refundText = "Your payment for $" + refundAmount + " was successfully refunded."
+      refundText = Number.isFinite(refundNum) 
+        ? `Your payment for $${refundAmount} was successfully refunded.`
+        : "Your payment was successfully refunded."
     } else if (paymentRecord.status === 'refund_failed') {
-      refundText = "Your payment for $" + refundAmount + " could not be automatically refunded. Please contact support."
+      refundText = Number.isFinite(refundNum) 
+        ? `Your payment for $${refundAmount} could not be automatically refunded. Please contact support.`
+        : "Your payment could not be automatically refunded. Please contact support."
     }
 
     return (
@@ -74,7 +93,8 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
   }
 
   if (paymentRecord.status === 'succeeded') {
-    const amountPaid = Number(paymentRecord.amount ?? 0).toFixed(2)
+    const amountNum = Number(paymentRecord.amount)
+    const amountPaid = Number.isFinite(amountNum) ? `$${amountNum.toFixed(2)}` : '—'
     
     return (
       <div className="text-center animate-in zoom-in-95 duration-300">
@@ -90,7 +110,7 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
 
         <div className="bg-[var(--surface-elevated)] border border-[var(--border-soft)] rounded-2xl p-6 mb-8 text-center space-y-2 max-w-sm mx-auto">
            <p className="text-sm font-medium text-[var(--muted)] uppercase tracking-wide">You paid</p>
-           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">${amountPaid}</p>
+           <p className="text-4xl font-bold text-[var(--accent)] tracking-tight">{amountPaid}</p>
         </div>
 
         <div className="space-y-6">

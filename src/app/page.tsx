@@ -6,28 +6,23 @@ import { CheckoutModal } from '@/components/CheckoutModal'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Clock, Globe } from 'lucide-react'
-import { useAuth } from '@/context/AuthContext'
-import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 // --- TYPES ---
 
 interface HeroSectionProps {
   currentPrice: number
-  quickUsername: string
-  setQuickUsername: (val: string) => void
+  quickWebsiteUrl: string
+  setQuickWebsiteUrl: (val: string) => void
   quickMessage: string
   setQuickMessage: (val: string) => void
-  quickLink: string
-  setQuickLink: (val: string) => void
   triggerCheckout: (e?: FormEvent) => void
 }
 
 interface CurrentHolderCardProps {
-  isInitialState: boolean
-    currentHolder: any
-  holderUsername: string
-  holderDisplayName: string
-  holderAvatar: string
+  currentHolder: any
+  holderWebsiteUrl: string
+  holderWebsiteName: string
+  holderWebsiteLogo: string
   holderMessage: string
   reignTime: string
   currentPrice: number
@@ -67,7 +62,7 @@ const timeAgo = (dateStr: string) => {
 
 // --- SUB-COMPONENTS ---
 
-function HeroSection({ currentPrice, quickUsername, setQuickUsername, quickMessage, setQuickMessage, quickLink, setQuickLink, triggerCheckout }: HeroSectionProps) {
+function HeroSection({ currentPrice, quickWebsiteUrl, setQuickWebsiteUrl, quickMessage, setQuickMessage, triggerCheckout }: HeroSectionProps) {
   return (
     <section className="text-center w-full max-w-3xl flex flex-col items-center mb-16 md:mb-20">
       <div className="text-[11px] md:text-[12px] font-bold text-[var(--muted)] uppercase tracking-[0.1em] mb-4 md:mb-5">
@@ -86,34 +81,28 @@ function HeroSection({ currentPrice, quickUsername, setQuickUsername, quickMessa
 
       <form 
         onSubmit={triggerCheckout}
-        className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-1.5 flex flex-col md:flex-row gap-1.5 shadow-sm focus-within:border-[var(--accent)] transition-all mb-4"
+        className="w-full max-w-2xl bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-1.5 flex flex-col md:flex-row gap-1.5 shadow-sm focus-within:border-[var(--accent)] transition-all mb-4"
       >
         <input 
-          type="text" 
-          placeholder="@username" 
-          value={quickUsername}
-          onChange={(e) => setQuickUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-          className="flex-1 bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium"
+          type="url" 
+          required
+          placeholder="https://yourwebsite.com" 
+          value={quickWebsiteUrl}
+          onChange={(e) => setQuickWebsiteUrl(e.target.value)}
+          className="flex-[1.5] bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium"
         />
         <div className="hidden md:block w-px bg-[var(--border)] my-2" />
         <input 
           type="text" 
+          required
           placeholder="Your claim..." 
           value={quickMessage}
           onChange={(e) => setQuickMessage(e.target.value)}
           className="flex-[2] bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium border-t md:border-t-0 border-[var(--border)]"
         />
-        <div className="hidden md:block w-px bg-[var(--border)] my-2" />
-        <input 
-          type="text" 
-          placeholder="website.com" 
-          value={quickLink}
-          onChange={(e) => setQuickLink(e.target.value)}
-          className="flex-1 bg-transparent px-4 py-3 outline-none text-[15px] placeholder-[var(--muted)] font-medium border-t md:border-t-0 border-[var(--border)]"
-        />
         <button 
           type="submit"
-          className="bg-[var(--accent)] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold tracking-wide hover:opacity-90 transition-all active:scale-[0.98] mt-1.5 md:mt-0 uppercase"
+          className="bg-[var(--accent)] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold tracking-wide hover:opacity-90 transition-all active:scale-[0.98] mt-1.5 md:mt-0 uppercase shrink-0"
         >
           Replace #1
         </button>
@@ -147,44 +136,35 @@ function HowItWorks() {
   )
 }
 
-function CurrentHolderCard({ isInitialState, currentHolder, holderUsername, holderDisplayName, holderAvatar, holderMessage, reignTime, currentPrice, triggerCheckout }: CurrentHolderCardProps) {
-  
-  // Use user's uploaded avatar if available. If it's the initial seeded state, use the default hero avatar.
-  const uploadedAvatar = currentHolder?.user?.avatar_url
-  const showFallback = !isInitialState && !uploadedAvatar
-  const avatarUrl = isInitialState ? holderAvatar : uploadedAvatar
-
+function CurrentHolderCard({ currentHolder, holderWebsiteUrl, holderWebsiteName, holderWebsiteLogo, holderMessage, reignTime, currentPrice, triggerCheckout }: CurrentHolderCardProps) {
   return (
     <section className="w-full max-w-5xl mb-16 md:mb-20">
       <h3 className="text-[12px] md:text-[14px] font-bold text-[var(--muted)] uppercase tracking-[0.05em] mb-4 pl-1">CURRENT #1</h3>
       
       <div className="w-full bg-[var(--surface-featured)] border border-[var(--border-featured)] rounded-[16px] p-5 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8 transition-all min-h-[180px] shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
         
-        {/* LEFT: Rank & User Identity */}
+        {/* LEFT: Rank & Identity */}
         <div className="flex items-center gap-4 w-full md:w-auto md:min-w-[260px] flex-shrink-0">
           <span className="text-[20px] md:text-[24px] font-bold text-[var(--accent)] w-8 text-center shrink-0">#1</span>
           
-          {showFallback ? (
-            <InitialsAvatar 
-              name={holderDisplayName || holderUsername || 'User'} 
-              className="w-16 h-16 md:w-[88px] md:h-[88px] border border-[var(--border)] text-[22px] md:text-[28px]" 
+          {holderWebsiteLogo ? (
+            <img
+              src={holderWebsiteLogo}
+              alt={holderWebsiteName}
+              className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-[16px] object-cover border border-[var(--border)] shrink-0 bg-[var(--surface)]"
             />
           ) : (
-            <img
-              src={avatarUrl}
-              alt={holderUsername}
-              className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-full object-cover border border-[var(--border)] shrink-0 bg-[var(--surface)]"
-            />
+            <div className="w-16 h-16 md:w-[88px] md:h-[88px] rounded-[16px] border border-[var(--border)] shrink-0 bg-[var(--surface)] flex items-center justify-center text-gray-400 font-bold">
+              URL
+            </div>
           )}
 
           <div className="flex flex-col min-w-0">
-            {holderDisplayName && (
-              <span className="text-[22px] md:text-[26px] font-bold text-[var(--foreground)] leading-tight tracking-tight truncate max-w-[200px] md:max-w-[240px]">
-                {holderDisplayName}
-              </span>
-            )}
+            <span className="text-[22px] md:text-[26px] font-bold text-[var(--foreground)] leading-tight tracking-tight truncate max-w-[200px] md:max-w-[240px]">
+              {holderWebsiteName}
+            </span>
             <span className="text-[14px] md:text-[15px] text-[var(--secondary)] font-medium mt-0.5 truncate max-w-[200px] md:max-w-[240px]">
-              @{holderUsername}
+              {holderWebsiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
             </span>
           </div>
         </div>
@@ -198,21 +178,19 @@ function CurrentHolderCard({ isInitialState, currentHolder, holderUsername, hold
           )}
           
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-4 text-[13px] md:text-[14px] text-[var(--secondary)] font-medium tabular-nums">
-            {currentHolder?.website_url && !isInitialState && (
-              <a
-                href={currentHolder.website_url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-[var(--accent)] font-semibold hover:opacity-80 transition-opacity truncate max-w-full sm:max-w-[200px]"
-              >
-                <Globe className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{currentHolder.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
-              </a>
-            )}
+            <a
+              href={holderWebsiteUrl.startsWith('http') ? holderWebsiteUrl : `https://${holderWebsiteUrl}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-[var(--accent)] font-semibold hover:opacity-80 transition-opacity truncate max-w-full sm:max-w-[200px]"
+            >
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{holderWebsiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+            </a>
             
             <span className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 shrink-0" /> 
-              Held #1 for {isInitialState ? '0s' : reignTime}
+              Held #1 for {reignTime}
             </span>
           </div>
         </div>
@@ -244,29 +222,28 @@ function ReplacementRow({ rep, idx }: { rep: any, idx: number }) {
         <span className="text-[14px] md:text-[15px] font-bold text-[var(--muted)] w-8 text-center tabular-nums">
           #{idx + 2}
         </span>
-        {rep.new_user?.avatar_url ? (
+        {rep.new_website_logo ? (
           <img 
-            src={rep.new_user.avatar_url}
-            alt={rep.new_user.username}
-            className="w-10 h-10 rounded-full border border-[var(--border)] object-cover bg-white shrink-0"
+            src={rep.new_website_logo}
+            alt={rep.new_website_name}
+            className="w-10 h-10 rounded-[8px] border border-[var(--border)] object-cover bg-white shrink-0"
           />
         ) : (
-          <InitialsAvatar 
-            name={rep.new_user?.display_name || rep.new_user?.username || 'User'} 
-            className="w-10 h-10 border border-[var(--border)] text-[14px] shrink-0"
-          />
+          <div className="w-10 h-10 rounded-[8px] border border-[var(--border)] flex items-center justify-center text-gray-400 font-bold shrink-0">
+            W
+          </div>
         )}
         <div className="flex flex-col">
           <span className="text-[15px] font-bold text-[var(--foreground)] leading-tight">
-            {rep.new_user?.display_name || rep.new_user?.username || 'Anonymous'}
+            {rep.new_website_name}
           </span>
-          <span className="text-[13px] text-[var(--secondary)] font-medium">@{rep.new_user?.username || 'anon'}</span>
+          <span className="text-[13px] text-[var(--secondary)] font-medium truncate max-w-[150px]">{rep.new_website_url?.replace(/^https?:\/\//, '')}</span>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col justify-center sm:px-4 w-full sm:w-auto pl-14 sm:pl-0 min-w-0">
         <span className="text-[14px] text-[var(--foreground)] font-medium truncate">
-          replaced @{rep.previous_user?.username || 'someone'}
+          replaced {rep.previous_website_name || 'someone'}
         </span>
         <span className="text-[12px] md:text-[13px] text-[var(--muted)] font-medium mt-0.5">
           {timeAgo(rep.created_at)}
@@ -357,14 +334,13 @@ function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const { profile } = useAuth()
 
   // State
-    const [currentHolder, setCurrentHolder] = useState<any>(null)
+  const [currentHolder, setCurrentHolder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [replacementsCount, setReplacementsCount] = useState(0)
-    const [recentReplacements, setRecentReplacements] = useState<any[]>([])
+  const [recentReplacements, setRecentReplacements] = useState<any[]>([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [reignTime, setReignTime] = useState('0s')
   
@@ -373,15 +349,8 @@ function HomeContent() {
   const [longestReign, setLongestReign] = useState(0)
 
   // Quick form state
-  const [quickUsername, setQuickUsername] = useState('')
+  const [quickWebsiteUrl, setQuickWebsiteUrl] = useState('')
   const [quickMessage, setQuickMessage] = useState('')
-  const [quickLink, setQuickLink] = useState('')
-
-  useEffect(() => {
-    if (profile) {
-      setTimeout(() => setQuickUsername(profile.username || ''), 0)
-    }
-  }, [profile])
 
   const fetchGameState = useCallback(async () => {
     if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
@@ -389,13 +358,9 @@ function HomeContent() {
         current_price: 1.00,
         replaced_at: new Date().toISOString(),
         custom_message: 'Someone has to be first. Replace me to start the game.',
-        website_url: 'https://replaceme.lol',
-        user: {
-          id: '00000000-0000-0000-0000-000000000000',
-          username: 'replaceme',
-          display_name: 'ReplaceMe System',
-          avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60'
-        }
+        website_url: 'replaceme.lol',
+        website_name: 'ReplaceMe',
+        website_logo: '/replaceme-avatar.svg'
       })
       setReplacementsCount(0)
       setRecentReplacements([])
@@ -409,13 +374,7 @@ function HomeContent() {
     try {
       const { data: holder, error: holderError } = await supabase
         .from('current_holder')
-        .select(`
-          current_price,
-          replaced_at,
-          custom_message,
-          website_url,
-          user:users(*)
-        `)
+        .select('*')
         .maybeSingle()
 
       if (holderError) throw holderError
@@ -435,8 +394,12 @@ function HomeContent() {
           amount_paid,
           created_at,
           previous_holder_duration,
-          previous_user:users!replacements_previous_user_id_fkey(username, avatar_url, display_name),
-          new_user:users!replacements_new_user_id_fkey(username, avatar_url, display_name)
+          previous_website_url,
+          previous_website_name,
+          previous_website_logo,
+          new_website_url,
+          new_website_name,
+          new_website_logo
         `)
         .order('created_at', { ascending: false })
         .limit(10)
@@ -458,20 +421,16 @@ function HomeContent() {
       
       setError(false)
     } catch (err: any) {
-      console.error('Failed to load game state from Supabase:', err.message || err, err.details, err.hint)
+      console.error('Failed to load game state from Supabase:', err.message || err)
       console.log('Falling back to local demo state for UI development...')
       
       setCurrentHolder({
         current_price: 1.00,
         replaced_at: new Date().toISOString(),
         custom_message: 'Someone has to be first. Replace me to start the game.',
-        website_url: 'https://replaceme.lol',
-        user: {
-          id: '00000000-0000-0000-0000-000000000000',
-          username: 'replaceme',
-          display_name: 'ReplaceMe System',
-          avatar_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60'
-        }
+        website_url: 'replaceme.lol',
+        website_name: 'ReplaceMe',
+        website_logo: '/replaceme-avatar.svg'
       })
       setReplacementsCount(0)
       setRecentReplacements([])
@@ -484,7 +443,7 @@ function HomeContent() {
   }, [supabase])
 
   useEffect(() => {
-        fetchGameState()
+    fetchGameState()
 
     const holderChannel = supabase
       .channel('current-holder-changes')
@@ -549,17 +508,12 @@ function HomeContent() {
     )
   }
 
-  // Exact ID check for seeded initial user
-  const isInitialState = currentHolder?.user?.id === '00000000-0000-0000-0000-000000000000';
-  const holderUser = currentHolder?.user;
   const currentPrice = currentHolder ? Number(currentHolder.current_price) : 1.0;
   
-  const holderUsername = isInitialState ? 'replaceme' : (holderUser?.username || 'replaceme');
-  const holderDisplayName = isInitialState ? 'ReplaceMe' : (holderUser?.display_name || holderUsername);
-  const holderAvatar = isInitialState 
-    ? '/replaceme-avatar.svg' 
-    : (holderUser?.avatar_url || '');
-  const holderMessage = isInitialState ? 'Someone has to be first.' : (currentHolder?.custom_message || 'I am the reigning #1.');
+  const holderWebsiteUrl = currentHolder?.website_url || 'replaceme.lol';
+  const holderWebsiteName = currentHolder?.website_name || 'ReplaceMe';
+  const holderWebsiteLogo = currentHolder?.website_logo || '/replaceme-avatar.svg';
+  const holderMessage = currentHolder?.custom_message || 'I am the reigning #1.';
 
   return (
     <>
@@ -569,23 +523,20 @@ function HomeContent() {
         
         <HeroSection 
           currentPrice={currentPrice}
-          quickUsername={quickUsername}
-          setQuickUsername={setQuickUsername}
+          quickWebsiteUrl={quickWebsiteUrl}
+          setQuickWebsiteUrl={setQuickWebsiteUrl}
           quickMessage={quickMessage}
           setQuickMessage={setQuickMessage}
-          quickLink={quickLink}
-          setQuickLink={setQuickLink}
           triggerCheckout={triggerCheckout}
         />
 
         <HowItWorks />
 
         <CurrentHolderCard 
-          isInitialState={isInitialState}
           currentHolder={currentHolder}
-          holderUsername={holderUsername}
-          holderDisplayName={holderDisplayName}
-          holderAvatar={holderAvatar}
+          holderWebsiteUrl={holderWebsiteUrl}
+          holderWebsiteName={holderWebsiteName}
+          holderWebsiteLogo={holderWebsiteLogo}
           holderMessage={holderMessage}
           reignTime={reignTime}
           currentPrice={currentPrice}
@@ -631,7 +582,7 @@ function HomeContent() {
                   <div key={rep.id} className="relative text-[13px] md:text-[14px] text-[var(--secondary)] font-medium leading-relaxed">
                     <div className="absolute -left-[21px] top-2 w-2 h-2 rounded-full bg-[var(--border)]" />
                     <p>
-                      <span className="font-bold text-[var(--foreground)]">@{rep.new_user?.username}</span> replaced <span className="font-bold text-[var(--foreground)]">@{rep.previous_user?.username}</span> for <span className="tabular-nums font-bold">${Number(rep.amount_paid).toFixed(0)}</span> <span className="text-[var(--muted)] block mt-0.5">{timeAgo(rep.created_at)}</span>
+                      <span className="font-bold text-[var(--foreground)]">{rep.new_website_name}</span> replaced <span className="font-bold text-[var(--foreground)]">{rep.previous_website_name || 'someone'}</span> for <span className="tabular-nums font-bold">${Number(rep.amount_paid).toFixed(0)}</span> <span className="text-[var(--muted)] block mt-0.5">{timeAgo(rep.created_at)}</span>
                     </p>
                   </div>
                 ))}
@@ -664,11 +615,10 @@ function HomeContent() {
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         currentPrice={currentPrice}
-        currentUsername={holderUsername}
+        currentWebsite={holderWebsiteName}
         prefilledData={{
-          username: quickUsername,
-          message: quickMessage,
-          link: quickLink
+          websiteUrl: quickWebsiteUrl,
+          message: quickMessage
         }}
       />
     </>

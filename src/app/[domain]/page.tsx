@@ -1,14 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
-import { InitialsAvatar } from '@/components/InitialsAvatar'
 import { Header } from '@/components/Header'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Globe, Clock } from 'lucide-react'
 
-import { isValidUsername } from '@/utils/validation'
-
 interface ProfilePageProps {
-  params: Promise<{ username: string }>
+  params: Promise<{ domain: string }>
 }
 
 function formatDuration(sec: number) {
@@ -21,45 +18,59 @@ function formatDuration(sec: number) {
 }
 
 export default async function PublicProfilePage({ params }: ProfilePageProps) {
-  const { username: rawUsername } = await params
+  const { domain: rawDomain } = await params
   
-  // Clean the username (supports both /@username and /username)
-  const decoded = decodeURIComponent(rawUsername)
-  const username = decoded.startsWith('@') ? decoded.slice(1) : decoded
-
-  if (!isValidUsername(username)) {
-    notFound()
-  }
+  const decoded = decodeURIComponent(rawDomain)
+  // Remove @ if it exists
+  const domain = decoded.startsWith('@') ? decoded.slice(1) : decoded
 
   const supabase = await createClient()
 
-  // 1. Fetch user profile
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .ilike('username', username)
-    .single()
-
-  if (userError || !user) {
-    notFound()
-  }
-
-  // 2. Fetch current holder status
+  // 1. Check if this domain is the current holder
   const { data: currentHolder } = await supabase
     .from('current_holder')
     .select('*')
     .single()
 
-  const isCurrentlyNumberOne = currentHolder?.user_id === user.id
-  
-  // 3. Fetch past reign stats if they aren't currently #1, or total reign time
+  const isCurrentlyNumberOne = currentHolder?.website_url === domain
+
+  // 2. Fetch past reign stats from replacements
   const { data: replacements } = await supabase
     .from('replacements')
-    .select('previous_holder_duration')
-    .eq('previous_user_id', user.id)
+    .select('previous_holder_duration, previous_website_url, previous_website_name, previous_website_logo, new_website_url, new_website_name, new_website_logo')
+    .or(`previous_website_url.eq.${domain},new_website_url.eq.${domain}`)
 
-  const totalPastReignSeconds = replacements?.reduce((acc, curr) => acc + Number(curr.previous_holder_duration || 0), 0) || 0
-  const totalReplacements = replacements?.length || 0
+  if (!isCurrentlyNumberOne && (!replacements || replacements.length === 0)) {
+    // Domain has never participated
+    notFound()
+  }
+
+  // Calculate total reign time (when they were the previous_website_url)
+  const pastReigns = replacements?.filter(r => r.previous_website_url === domain) || []
+  const totalPastReignSeconds = pastReigns.reduce((acc, curr) => acc + Number(curr.previous_holder_duration || 0), 0)
+  
+  // Find latest metadata (name/logo)
+  let websiteName = domain
+  let websiteLogo = ''
+  
+  if (isCurrentlyNumberOne) {
+    websiteName = currentHolder.website_name || domain
+    websiteLogo = currentHolder.website_logo || ''
+  } else {
+    // Find the most recent entry where they were the new holder
+    const recentAsNew = replacements?.filter(r => r.new_website_url === domain).pop()
+    if (recentAsNew) {
+      websiteName = recentAsNew.new_website_name || domain
+      websiteLogo = recentAsNew.new_website_logo || ''
+    } else {
+      // Or when they were previous holder
+      const recentAsPrev = pastReigns.pop()
+      if (recentAsPrev) {
+        websiteName = recentAsPrev.previous_website_name || domain
+        websiteLogo = recentAsPrev.previous_website_logo || ''
+      }
+    }
+  }
 
   return (
     <>
@@ -68,17 +79,14 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         
         {/* AVATAR */}
         <div className="mb-6 relative">
-          {user.avatar_url ? (
+          {websiteLogo ? (
             <img 
-              src={user.avatar_url} 
-              alt={user.username} 
-              className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-[var(--surface)] shadow-lg bg-[var(--surface)]"
+              src={websiteLogo} 
+              alt={websiteName} 
+              className="w-24 h-24 md:w-32 md:h-32 rounded-[20px] object-cover border-4 border-[var(--surface)] shadow-lg bg-[var(--surface)]"
             />
           ) : (
-            <InitialsAvatar 
-              name={user.display_name || user.username} 
-              className="w-24 h-24 md:w-32 md:h-32 border-4 border-[var(--surface)] text-3xl shadow-lg"
-            />
+            <div className="w-24 h-24 md:w-32 md:h-32 rounded-[20px] border-4 border-[var(--surface)] bg-[var(--surface-elevated)] flex items-center justify-center font-bold text-3xl shadow-lg">W</div>
           )}
           {isCurrentlyNumberOne && (
             <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[var(--accent)] text-white flex items-center justify-center rounded-full text-xl shadow-md border-4 border-[var(--background)]" title="Currently #1">
@@ -89,31 +97,22 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
         {/* IDENTITY */}
         <h1 className="text-3xl md:text-4xl font-bold text-[var(--foreground)] tracking-tight leading-tight">
-          {user.display_name || user.username}
+          {websiteName}
         </h1>
         <p className="text-lg text-[var(--secondary)] font-medium mt-1">
-          @{user.username}
+          {domain}
         </p>
 
-        {/* CLAIM */}
-        {user.bio && (
-          <div className="mt-8 text-xl md:text-2xl font-medium text-[var(--foreground)] leading-snug">
-            &quot;{user.bio}&quot;
-          </div>
-        )}
-
         {/* WEBSITE */}
-        {user.website_url && (
-          <a
-            href={user.website_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-[var(--accent)] font-bold mt-6 hover:opacity-80 transition-opacity bg-[var(--surface-elevated)] px-5 py-2.5 rounded-full"
-          >
-            <Globe className="w-4 h-4" />
-            {user.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-          </a>
-        )}
+        <a
+          href={`https://${domain}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 text-[var(--accent)] font-bold mt-6 hover:opacity-80 transition-opacity bg-[var(--surface-elevated)] px-5 py-2.5 rounded-full"
+        >
+          <Globe className="w-4 h-4" />
+          Visit Website
+        </a>
 
         {/* REIGN INFO */}
         <div className="mt-12 w-full pt-10 border-t border-[var(--border-soft)]">

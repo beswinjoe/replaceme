@@ -5,15 +5,13 @@ import { Header } from '@/components/Header'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { Crown, Skull, DollarSign, Swords, Flame } from 'lucide-react'
-import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 type LeaderboardTab = 'reign' | 'replacements' | 'spenders' | 'replaced' | 'biggest'
 
 interface LeaderboardItem {
-  userId: string
-  username: string
-  displayName: string
-  avatarUrl: string
+  websiteUrl: string
+  websiteName: string
+  websiteLogo: string
   score: number
   formattedScore: string
 }
@@ -46,10 +44,12 @@ export default function LeaderboardPage() {
         .select(`
           amount_paid,
           previous_holder_duration,
-          previous_user_id,
-          new_user_id,
-          new_user:users!replacements_new_user_id_fkey(*),
-          previous_user:users!replacements_previous_user_id_fkey(*)
+          previous_website_url,
+          previous_website_name,
+          previous_website_logo,
+          new_website_url,
+          new_website_name,
+          new_website_logo
         `)
 
       if (error) {
@@ -60,93 +60,83 @@ export default function LeaderboardPage() {
         throw new Error('No data returned from replacements table')
       }
 
-      const reignMap = new Map<string, { user: any; maxDuration: number }>()
-      const replacementsMap = new Map<string, { user: any; count: number }>()
-      const spenderMap = new Map<string, { user: any; total: number }>()
-      const replacedMap = new Map<string, { user: any; count: number }>()
+      const reignMap = new Map<string, { url: string; name: string; logo: string; maxDuration: number }>()
+      const replacementsMap = new Map<string, { url: string; name: string; logo: string; count: number }>()
+      const spenderMap = new Map<string, { url: string; name: string; logo: string; total: number }>()
+      const replacedMap = new Map<string, { url: string; name: string; logo: string; count: number }>()
 
       replacements.forEach((rep) => {
-        const newUser = rep.new_user as any
-        const prevUser = rep.previous_user as any
         const amount = Number(rep.amount_paid)
         const duration = Number(rep.previous_holder_duration || 0)
 
-        if (prevUser && prevUser.id !== '00000000-0000-0000-0000-000000000000') {
-          const current = reignMap.get(prevUser.id)
+        // Previous holder logic
+        if (rep.previous_website_url && rep.previous_website_url !== 'replaceme.lol') {
+          const current = reignMap.get(rep.previous_website_url)
           if (!current || duration > current.maxDuration) {
-            reignMap.set(prevUser.id, { user: prevUser, maxDuration: duration })
+            reignMap.set(rep.previous_website_url, { url: rep.previous_website_url, name: rep.previous_website_name, logo: rep.previous_website_logo, maxDuration: duration })
           }
+
+          const currentReplaced = replacedMap.get(rep.previous_website_url)
+          replacedMap.set(rep.previous_website_url, { url: rep.previous_website_url, name: rep.previous_website_name, logo: rep.previous_website_logo, count: (currentReplaced?.count || 0) + 1 })
         }
 
-        if (newUser && newUser.id !== '00000000-0000-0000-0000-000000000000') {
-          const current = replacementsMap.get(newUser.id)
-          replacementsMap.set(newUser.id, { user: newUser, count: (current?.count || 0) + 1 })
-        }
+        // New holder logic
+        if (rep.new_website_url && rep.new_website_url !== 'replaceme.lol') {
+          const currentRep = replacementsMap.get(rep.new_website_url)
+          replacementsMap.set(rep.new_website_url, { url: rep.new_website_url, name: rep.new_website_name, logo: rep.new_website_logo, count: (currentRep?.count || 0) + 1 })
 
-        if (newUser && newUser.id !== '00000000-0000-0000-0000-000000000000') {
-          const current = spenderMap.get(newUser.id)
-          spenderMap.set(newUser.id, { user: newUser, total: (current?.total || 0) + amount })
-        }
-
-        if (prevUser && prevUser.id !== '00000000-0000-0000-0000-000000000000') {
-          const current = replacedMap.get(prevUser.id)
-          replacedMap.set(prevUser.id, { user: prevUser, count: (current?.count || 0) + 1 })
+          const currentSpend = spenderMap.get(rep.new_website_url)
+          spenderMap.set(rep.new_website_url, { url: rep.new_website_url, name: rep.new_website_name, logo: rep.new_website_logo, total: (currentSpend?.total || 0) + amount })
         }
       })
 
       const reignArr: LeaderboardItem[] = Array.from(reignMap.values())
-        .map(({ user, maxDuration }) => ({
-          userId: user.id,
-          username: user.username,
-          displayName: user.display_name || user.username,
-          avatarUrl: user.avatar_url || '',
-          score: maxDuration,
-          formattedScore: formatDuration(maxDuration),
+        .map((data) => ({
+          websiteUrl: data.url,
+          websiteName: data.name,
+          websiteLogo: data.logo,
+          score: data.maxDuration,
+          formattedScore: formatDuration(data.maxDuration),
         }))
         .sort((a, b) => b.score - a.score)
 
       const replacementsArr: LeaderboardItem[] = Array.from(replacementsMap.values())
-        .map(({ user, count }) => ({
-          userId: user.id,
-          username: user.username,
-          displayName: user.display_name || user.username,
-          avatarUrl: user.avatar_url || '',
-          score: count,
-          formattedScore: `${count} times`,
+        .map((data) => ({
+          websiteUrl: data.url,
+          websiteName: data.name,
+          websiteLogo: data.logo,
+          score: data.count,
+          formattedScore: `${data.count} times`,
         }))
         .sort((a, b) => b.score - a.score)
 
       const spendersArr: LeaderboardItem[] = Array.from(spenderMap.values())
-        .map(({ user, total }) => ({
-          userId: user.id,
-          username: user.username,
-          displayName: user.display_name || user.username,
-          avatarUrl: user.avatar_url || '',
-          score: total,
-          formattedScore: `$${total.toFixed(2)}`,
+        .map((data) => ({
+          websiteUrl: data.url,
+          websiteName: data.name,
+          websiteLogo: data.logo,
+          score: data.total,
+          formattedScore: `$${data.total.toFixed(2)}`,
         }))
         .sort((a, b) => b.score - a.score)
 
       const replacedArr: LeaderboardItem[] = Array.from(replacedMap.values())
-        .map(({ user, count }) => ({
-          userId: user.id,
-          username: user.username,
-          displayName: user.display_name || user.username,
-          avatarUrl: user.avatar_url || '',
-          score: count,
-          formattedScore: `${count} times`,
+        .map((data) => ({
+          websiteUrl: data.url,
+          websiteName: data.name,
+          websiteLogo: data.logo,
+          score: data.count,
+          formattedScore: `${data.count} times`,
         }))
         .sort((a, b) => b.score - a.score)
 
       const biggestArr: LeaderboardItem[] = replacements
         .map((rep) => {
-          const user = rep.new_user as any
           const amount = Number(rep.amount_paid)
           return {
-            userId: user?.id || '',
-            username: user?.username || 'someone',
-            displayName: user?.display_name || user?.username || 'someone',
-            avatarUrl: user?.avatar_url || '',
+            websiteUrl: rep.new_website_url || '',
+            websiteName: rep.new_website_name || '',
+            websiteLogo: rep.new_website_logo || '',
             score: amount,
             formattedScore: `$${amount.toFixed(2)}`,
           }
@@ -176,28 +166,28 @@ export default function LeaderboardPage() {
       case 'reign':
         return {
           title: 'Longest Reigns',
-          desc: 'Users who held onto the #1 throne for the longest total duration.',
+          desc: 'Websites that held onto the #1 throne for the longest total duration.',
           icon: <Crown className="w-5 h-5 text-yellow-500" />,
           list: longestReigns,
         }
       case 'replacements':
         return {
           title: 'Most Replacements',
-          desc: 'Users who have successfully usurped the #1 spot the most times.',
+          desc: 'Websites that have successfully usurped the #1 spot the most times.',
           icon: <Skull className="w-5 h-5 text-gray-500" />,
           list: mostReplacements,
         }
       case 'spenders':
         return {
           title: 'Biggest Spenders',
-          desc: 'Users who spent the most capital taking back their pride.',
+          desc: 'Websites that spent the most capital taking back their pride.',
           icon: <DollarSign className="w-5 h-5 text-green-500" />,
           list: biggestSpenders,
         }
       case 'replaced':
         return {
           title: 'Most Replaced',
-          desc: 'Users who got kicked off the #1 spot the most times.',
+          desc: 'Websites that got kicked off the #1 spot the most times.',
           icon: <Swords className="w-5 h-5 text-orange-500" />,
           list: mostReplaced,
         }
@@ -278,7 +268,7 @@ export default function LeaderboardPage() {
                 const rank = index + 1
                 return (
                   <div
-                    key={`${item.userId}-${index}`}
+                    key={`${item.websiteUrl}-${index}`}
                     className="flex items-center justify-between p-4 rounded-2xl hover:bg-[var(--surface-elevated)] transition-colors group"
                   >
                     <div className="flex items-center gap-4">
@@ -290,25 +280,22 @@ export default function LeaderboardPage() {
                         </span>
                       </div>
                       
-                      <Link href={`/@${item.username}`} className="flex items-center gap-3">
-                        {item.avatarUrl ? (
+                      <Link href={`/${item.websiteUrl}`} className="flex items-center gap-3">
+                        {item.websiteLogo ? (
                           <img
-                            src={item.avatarUrl}
-                            alt={item.username}
-                            className="w-12 h-12 rounded-full object-cover border border-[var(--border-soft)] shadow-sm bg-[var(--surface)]"
+                            src={item.websiteLogo}
+                            alt={item.websiteName}
+                            className="w-12 h-12 rounded-[10px] object-cover border border-[var(--border-soft)] shadow-sm bg-[var(--surface)]"
                           />
                         ) : (
-                          <InitialsAvatar
-                            name={item.displayName || item.username}
-                            className="w-12 h-12 text-sm border border-[var(--border-soft)] shadow-sm"
-                          />
+                          <div className="w-12 h-12 text-sm border border-[var(--border-soft)] shadow-sm rounded-[10px] bg-[var(--surface-elevated)] flex items-center justify-center font-bold">W</div>
                         )}
                         <div>
                           <p className="font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
-                            {item.displayName}
+                            {item.websiteName}
                           </p>
                           <p className="text-sm font-medium text-gray-500">
-                            @{item.username}
+                            {item.websiteUrl}
                           </p>
                         </div>
                       </Link>

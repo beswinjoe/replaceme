@@ -53,48 +53,30 @@ export async function POST(req: Request) {
       // Metadata can be on the payment object or on the customer details
       const metadata = data.metadata || data.customer?.metadata
 
-      if (!metadata || !metadata.user_id) {
-        console.error('Webhook payment.succeeded missing metadata or user_id')
+      if (!metadata || !metadata.website_url) {
+        console.error('Webhook payment.succeeded missing metadata or website_url')
         return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
       }
 
-      const userId = metadata.user_id
       const amountPaid = Number(data.amount) / 100 // Convert cents back to dollars
-      const username = metadata.username
-      const displayName = metadata.display_name
-      const avatarUrl = metadata.avatar_url
-      const customMessage = metadata.custom_message
       const websiteUrl = metadata.website_url
+      const websiteName = metadata.website_name || websiteUrl
+      const websiteLogo = metadata.website_logo || ''
+      const customMessage = metadata.custom_message
 
       const supabaseAdmin = createAdminClient()
 
-      // 1. Update user profile details
-      if (username) {
-        const { error: userError } = await supabaseAdmin
-          .from('users')
-          .update({
-            username: username,
-            display_name: displayName || null,
-            avatar_url: avatarUrl || null,
-            website_url: websiteUrl || null
-          })
-          .eq('id', userId)
-
-        if (userError) {
-          console.error('Failed to update user profile in webhook:', userError)
-        }
-      }
-
-      // 2. Call the atomic database replacement transaction
+      // 1. Call the atomic database replacement transaction
       const paymentId = data.payment_id || data.transaction_id || data.session_id || 'unknown'
       const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
         'process_payment_and_replace',
         {
           p_payment_id: paymentId,
-          p_new_user_id: userId,
+          p_new_website_url: websiteUrl,
+          p_new_website_name: websiteName,
+          p_new_website_logo: websiteLogo,
           p_amount_paid: amountPaid,
           p_custom_message: customMessage || null,
-          p_website_url: websiteUrl || null,
           p_metadata: metadata
         }
       )
@@ -112,11 +94,13 @@ export async function POST(req: Request) {
       if (replaceData?.status === 'stale_price') {
         console.warn(`Stale price race condition: User paid ${amountPaid} but ${replaceData.required_price} was required.`)
         
-        // 3. Initiate Dodo Refund
+        // 2. Initiate Dodo Refund
         try {
           const refund = await dodo.refunds.create({
             payment_id: paymentId,
             reason: 'Stale price checkout race condition. User did not secure #1.',
+          }, {
+            idempotencyKey: paymentId
           })
           
           if (refund.status) {

@@ -1,123 +1,93 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/context/AuthContext'
-import { X, Sparkles, AlertCircle, RefreshCcw, Share } from 'lucide-react'
-import { isValidUsername } from '@/utils/validation'
-import { InitialsAvatar } from '@/components/InitialsAvatar'
-import confetti from 'canvas-confetti'
+import { X, AlertCircle } from 'lucide-react'
 
 interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
   currentPrice: number
-  currentUsername: string
+  currentWebsite: string
   prefilledData?: {
-    username: string
+    websiteUrl: string
     message: string
-    link: string
   }
 }
 
-const AVATAR_STYLES = ['pixel-art', 'bottts', 'adventurer', 'lorelei']
-
-export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, prefilledData }: CheckoutModalProps) {
-  const { user, profile, refreshProfile, demoLogin, loginWithEmail } = useAuth()
-  const [activeTab, setActiveTab] = useState<'auth' | 'edit'>('auth')
+export function CheckoutModal({ isOpen, onClose, currentPrice, currentWebsite, prefilledData }: CheckoutModalProps) {
   
-  // Auth Form State
-  const [email, setEmail] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [authMsg, setAuthMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Profile/Checkout Details State
-  const [username, setUsername] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
+  // Form State
+  const [websiteInput, setWebsiteInput] = useState('')
   const [customMessage, setCustomMessage] = useState('')
-  const [websiteUrl, setWebsiteUrl] = useState('')
+  
+  // Derived Identity
+  const [domain, setDomain] = useState('')
+  const [websiteName, setWebsiteName] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (user) {
-      setActiveTab('edit')
-      
-      setUsername(prefilledData?.username || profile?.username || '')
-      setDisplayName(profile?.display_name || '')
-      setAvatarUrl(profile?.avatar_url || '')
-      setWebsiteUrl(prefilledData?.link || profile?.website_url || '')
-      setCustomMessage(prefilledData?.message || `I just paid $${currentPrice.toFixed(2)} to take #1.`)
+    if (prefilledData) {
+      setWebsiteInput(prefilledData.websiteUrl)
+      setCustomMessage(prefilledData.message)
     } else {
-      setActiveTab('auth')
-      
-      if (prefilledData) {
-                setUsername(prefilledData.username)
-                setCustomMessage(prefilledData.message)
-                setWebsiteUrl(prefilledData.link)
-      }
+      setCustomMessage(`I just paid $${currentPrice.toFixed(2)} to take #1.`)
     }
-  }, [user, profile, isOpen, prefilledData, currentPrice])
+  }, [isOpen, prefilledData, currentPrice])
+
+  useEffect(() => {
+    try {
+      if (!websiteInput) {
+         setDomain('')
+         setWebsiteName('')
+         setLogoUrl('')
+         return
+      }
+      // Ensure we can parse it as a URL
+      const urlStr = websiteInput.startsWith('http') ? websiteInput : `https://${websiteInput}`
+      const url = new URL(urlStr)
+      const cleanDomain = url.hostname.replace(/^www\./, '')
+      
+      setDomain(cleanDomain)
+      // Capitalize first letter of domain as a decent fallback for website name
+      const nameFallback = cleanDomain.split('.')[0]
+      setWebsiteName(nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)) 
+      setLogoUrl(`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${cleanDomain}&size=128`)
+    } catch (e) {
+      // Let user keep typing
+      setDomain('')
+    }
+  }, [websiteInput])
 
   if (!isOpen) return null
-
-  // Sign In / Sign Up handler
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email) return
-    setAuthLoading(true)
-    setAuthMsg(null)
-
-    const res = await loginWithEmail(email)
-    setAuthLoading(false)
-
-    if (res.success) {
-      setAuthMsg({
-        type: 'success',
-        text: 'Check your email for the magic link to log in.',
-      })
-    } else {
-      setAuthMsg({ type: 'error', text: res.error || 'Failed to authenticate.' })
-    }
-  }
-
-  const handleInstantConnect = async () => {
-    setAuthLoading(true)
-    setAuthMsg(null)
-    const res = await demoLogin()
-    setAuthLoading(false)
-    if (!res.success) {
-      setAuthMsg({ type: 'error', text: res.error || 'Demo connection failed.' })
-    }
-  }
-
 
   // Pay/Simulate Handler
   const handlePayment = async (isDemo: boolean = false) => {
     setPaymentLoading(true)
     setPaymentError(null)
 
-    if (!isValidUsername(username)) {
-      setPaymentError('Username must be 3-15 alphanumeric characters and not a reserved route.')
+    if (!domain) {
+      setPaymentError('Please enter a valid website URL.')
       setPaymentLoading(false)
       return
     }
 
     if (!customMessage.trim()) {
-      setPaymentError('Custom message is required.')
+      setPaymentError('Your claim message is required.')
       setPaymentLoading(false)
       return
     }
 
-    const payload = {
-      username,
-      display_name: displayName || username,
-      avatar_url: avatarUrl,
-      custom_message: customMessage,
-      website_url: websiteUrl,
-    }
-
     try {
+      const payload = {
+        website_url: domain,
+        website_name: websiteName,
+        website_logo: logoUrl,
+        custom_message: customMessage,
+      }
+
       const endpoint = isDemo ? '/api/checkout/demo' : '/api/checkout'
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -157,155 +127,66 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
         {/* LEFT COLUMN: Form */}
         <div className="flex-1 p-8 md:p-10 border-b lg:border-b-0 lg:border-r border-[var(--border-soft)]">
           <div className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-              You&apos;re replacing @{currentUsername}
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2 uppercase">
+              You&apos;re replacing {currentWebsite}
             </h2>
             <p className="text-gray-500 text-sm">
-              Take the top spot for <span className="font-semibold text-[var(--foreground)]">${currentPrice.toFixed(2)}</span>
+              Claim the #1 spot for <span className="font-semibold text-[var(--foreground)]">${currentPrice.toFixed(2)}</span>.
             </p>
           </div>
 
           <div className="space-y-6">
-            {/* Step 1: Authentication */}
-            {activeTab === 'auth' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <div>
-                  <h3 className="font-semibold text-[var(--foreground)] text-lg mb-1">1. Connect</h3>
-                  <p className="text-sm text-gray-500 mb-4">Log in to claim your spot and save your stats.</p>
-                </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Website URL</label>
+              <input
+                type="url"
+                required
+                placeholder="https://yourwebsite.com"
+                value={websiteInput}
+                onChange={(e) => setWebsiteInput(e.target.value)}
+                className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              />
+            </div>
 
-                <form onSubmit={handleEmailAuth} className="space-y-3">
-                  <input
-                    type="email"
-                    required
-                    placeholder="Enter your email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3.5 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={authLoading}
-                    className="w-full bg-[var(--foreground)] text-[var(--background)] py-3.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
-                  >
-                    {authLoading ? 'Sending...' : 'Continue with Email'}
-                  </button>
-                </form>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Your Claim</label>
+              <textarea
+                rows={2}
+                maxLength={100}
+                required
+                placeholder="What do you want to say?"
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)] resize-none"
+              />
+            </div>
+            
+            {paymentError && (
+              <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm border border-red-100 dark:border-red-800">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>{paymentError}</p>
+              </div>
+            )}
 
-                {authMsg && (
-                  <div className={`p-3 rounded-lg text-sm font-medium ${
-                    authMsg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    {authMsg.text}
-                  </div>
-                )}
-
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-[var(--border-soft)]" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase font-medium">
-                    <span className="bg-[var(--surface)] px-2 text-gray-400">Or</span>
-                  </div>
-                </div>
-
+            <div className="pt-4 mt-2 space-y-3">
+              <button
+                onClick={() => handlePayment(false)}
+                disabled={paymentLoading || !domain || !customMessage}
+                className="w-full bg-[var(--accent)] text-white py-3.5 rounded-xl font-bold text-base hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-sm uppercase tracking-wide"
+              >
+                {paymentLoading ? 'Processing...' : `CLAIM #1 FOR $${currentPrice.toFixed(2)}`}
+              </button>
+              
+              {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
                 <button
-                  onClick={handleInstantConnect}
-                  disabled={authLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] py-3.5 rounded-xl font-bold text-sm hover:bg-[var(--border-soft)] transition-colors"
+                  onClick={() => handlePayment(true)}
+                  disabled={paymentLoading || !domain || !customMessage}
+                  className="w-full flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] py-3 rounded-xl font-semibold text-sm hover:bg-[var(--border-soft)] transition-colors disabled:opacity-50"
                 >
-                  <Sparkles className="h-4 w-4" /> Instant Connect (Demo)
+                   Simulate Demo Payment
                 </button>
-              </div>
-            )}
-
-            {/* Step 2: Edit Details */}
-            {activeTab === 'edit' && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[var(--foreground)] text-lg">2. Profile Setup</h3>
-                  <button onClick={() => setActiveTab('auth')} className="text-xs font-semibold text-gray-500 hover:text-[var(--foreground)] underline">Connected as @{username}</button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Username</label>
-                    <input
-                      type="text"
-                      maxLength={15}
-                      required
-                      placeholder="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                      className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Display Name</label>
-                    <input
-                      type="text"
-                      maxLength={20}
-                      placeholder="Optional"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Message</label>
-                  <textarea
-                    rows={2}
-                    maxLength={100}
-                    required
-                    placeholder="Say something..."
-                    value={customMessage}
-                    onChange={(e) => setCustomMessage(e.target.value)}
-                    className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)] resize-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Link (Optional)</label>
-                  <input
-                    type="url"
-                    placeholder="https://yourwebsite.com"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    className="w-full bg-[var(--surface-elevated)] border border-[var(--border-soft)] p-3 rounded-xl text-[var(--foreground)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                  />
-                </div>
-                
-
-                {paymentError && (
-                  <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm border border-red-100 dark:border-red-800">
-                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p>{paymentError}</p>
-                  </div>
-                )}
-
-                <div className="pt-4 space-y-3">
-                  <button
-                    onClick={() => handlePayment(false)}
-                    disabled={paymentLoading || !username || !customMessage}
-                    className="w-full bg-[var(--accent)] text-white py-3.5 rounded-xl font-bold text-base hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  >
-                    {paymentLoading ? 'Processing...' : `Continue to payment — $${currentPrice.toFixed(2)}`}
-                  </button>
-                  
-                  {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
-                    <button
-                      onClick={() => handlePayment(true)}
-                      disabled={paymentLoading || !username || !customMessage}
-                      className="w-full flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] py-3 rounded-xl font-semibold text-sm hover:bg-[var(--border-soft)] transition-colors disabled:opacity-50"
-                    >
-                       Simulate Demo Payment
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -320,41 +201,34 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
             </div>
 
             <div className="flex items-center gap-4 mb-4">
-              {avatarUrl ? (
+              {logoUrl ? (
                 <img
-                  src={avatarUrl}
-                  alt="preview avatar"
-                  className="w-12 h-12 rounded-full border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-cover"
+                  src={logoUrl}
+                  alt="website logo"
+                  className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-cover"
                 />
               ) : (
-                <InitialsAvatar
-                  name={displayName || username || 'Y N'}
-                  className="w-12 h-12 text-sm border border-[var(--border-soft)]"
-                />
+                <div className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xs font-medium">
+                  URL
+                </div>
               )}
-              <div>
+              <div className="overflow-hidden">
                 <h4 className="font-bold text-[var(--foreground)] truncate max-w-[160px]">
-                  {displayName || 'Your Name'}
+                  {websiteName || 'Website Name'}
                 </h4>
                 <p className="text-sm text-gray-500 truncate max-w-[160px]">
-                  @{username || 'username'}
+                  {domain || 'website.com'}
                 </p>
               </div>
             </div>
 
             <div className="text-sm font-medium text-[var(--foreground)] mb-4 italic break-words">
-              &quot;{customMessage || 'Your message will appear here.'}&quot;
+              &quot;{customMessage || 'Your claim will appear here.'}&quot;
             </div>
-
-            {websiteUrl && (
-              <div className="text-xs font-semibold text-[var(--accent)] truncate flex items-center gap-1.5">
-                🔗 {websiteUrl.replace(/^https?:\/\//, '')}
-              </div>
-            )}
           </div>
           
           <div className="mt-8 text-center">
-             <h3 className="text-lg font-semibold text-[var(--foreground)]">You will replace @{currentUsername}.</h3>
+             <h3 className="text-lg font-semibold text-[var(--foreground)]">You will replace {currentWebsite}.</h3>
           </div>
         </div>
 

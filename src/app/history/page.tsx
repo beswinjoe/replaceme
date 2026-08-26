@@ -5,7 +5,6 @@ import { Header } from '@/components/Header'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { ExternalLink, Clock } from 'lucide-react'
-import { InitialsAvatar } from '@/components/InitialsAvatar'
 
 export default function HistoryPage() {
   const supabase = createClient()
@@ -23,10 +22,13 @@ export default function HistoryPage() {
           price_after,
           previous_holder_duration,
           custom_message,
-          website_url,
-          created_at,
-          previous_user:users!replacements_previous_user_id_fkey(*),
-          new_user:users!replacements_new_user_id_fkey(*)
+          previous_website_url,
+          previous_website_name,
+          previous_website_logo,
+          new_website_url,
+          new_website_name,
+          new_website_logo,
+          created_at
         `)
         .order('created_at', { ascending: false })
 
@@ -110,28 +112,26 @@ export default function HistoryPage() {
         ) : (
           <div className="space-y-6 relative before:absolute before:inset-0 before:ml-6 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[var(--border-soft)] before:to-transparent">
             {replacements.map((rep) => {
-              const previousUser = rep.previous_user
-              const newUser = rep.new_user
-              const isFirstUser = !previousUser || previousUser.id === '00000000-0000-0000-0000-000000000000'
+              const isFirstUser = !rep.previous_website_url || rep.previous_website_url === 'replaceme.lol'
 
               return (
                 <div key={rep.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                   
                   {/* Timeline Dot */}
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-[var(--background)] bg-[var(--surface)] text-gray-400 group-hover:text-[var(--accent)] group-hover:border-[var(--accent)] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm transition-colors z-10 overflow-hidden">
-                    {newUser?.avatar_url ? (
-                      <img src={newUser.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl border-4 border-[var(--background)] bg-[var(--surface)] text-gray-400 group-hover:border-[var(--accent)] shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm transition-colors z-10 overflow-hidden">
+                    {rep.new_website_logo ? (
+                      <img src={rep.new_website_logo} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <InitialsAvatar name={newUser?.display_name || newUser?.username || 'Y N'} className="w-full h-full text-xl" />
+                      <div className="w-full h-full font-bold text-lg flex items-center justify-center bg-[var(--surface-elevated)]">W</div>
                     )}
                   </div>
 
                   <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-5 hover:border-gray-300 dark:hover:border-gray-600 transition-colors shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <Link href={`/@${newUser?.username}`} className="font-bold text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
-                          @{newUser?.username || 'someone'}
-                        </Link>
+                        <span className="font-bold text-[var(--foreground)]">
+                          {rep.new_website_name}
+                        </span>
                       </div>
                       <span className="font-bold text-[var(--accent)]">
                         ${Number(rep.amount_paid).toFixed(2)}
@@ -140,9 +140,9 @@ export default function HistoryPage() {
 
                     <div className="text-sm text-gray-500 font-medium mb-3">
                       Replaced {isFirstUser ? 'the official account' : (
-                        <Link href={`/@${previousUser?.username}`} className="text-[var(--foreground)] hover:text-[var(--accent)] transition-colors font-semibold">
-                          @{previousUser?.username}
-                        </Link>
+                        <span className="text-[var(--foreground)] font-semibold">
+                          {rep.previous_website_name}
+                        </span>
                       )}
                     </div>
 
@@ -162,8 +162,8 @@ export default function HistoryPage() {
                           Held for {formatDuration(rep.previous_holder_duration)}
                         </span>
                       )}
-                      {rep.website_url && (
-                        <a href={rep.website_url} target="_blank" rel="noreferrer" className="text-[var(--accent)] hover:underline inline-flex items-center gap-1">
+                      {rep.new_website_url && (
+                        <a href={rep.new_website_url.startsWith('http') ? rep.new_website_url : `https://${rep.new_website_url}`} target="_blank" rel="noreferrer" className="text-[var(--accent)] hover:underline inline-flex items-center gap-1">
                           Link <ExternalLink className="w-3 h-3" />
                         </a>
                       )}

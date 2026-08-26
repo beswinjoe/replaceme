@@ -9,14 +9,13 @@ export async function POST(req: Request) {
     }
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const body = await req.json()
-    const { username, display_name, avatar_url, custom_message, website_url } = body
+    const { website_url, website_name, website_logo, custom_message } = body
+
+    if (!website_url) {
+      return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
+    }
 
     // 1. Fetch current price
     const { data: holder, error: holderError } = await supabase
@@ -30,25 +29,8 @@ export async function POST(req: Request) {
 
     const currentPrice = Number(holder.current_price)
 
-    // 2. Initialize Supabase Admin to execute profile update & replacement
+    // 2. Initialize Supabase Admin to execute replacement
     const supabaseAdmin = createAdminClient()
-
-    // Update user profile details
-    if (username) {
-      const { error: updateError } = await supabaseAdmin
-        .from('users')
-        .update({
-          username: username,
-          display_name: display_name || null,
-          avatar_url: avatar_url || null,
-          website_url: website_url || null
-        })
-        .eq('id', user.id)
-
-      if (updateError) {
-        console.error('Failed to update user profile in demo checkout:', updateError)
-      }
-    }
 
     const sessionId = `demo_${Math.random().toString(36).substring(7)}`
 
@@ -57,10 +39,11 @@ export async function POST(req: Request) {
       'process_payment_and_replace',
       {
         p_payment_id: sessionId,
-        p_new_user_id: user.id,
+        p_new_website_url: website_url,
+        p_new_website_name: website_name || website_url,
+        p_new_website_logo: website_logo || '',
         p_amount_paid: currentPrice,
         p_custom_message: custom_message || null,
-        p_website_url: website_url || null,
         p_metadata: body
       }
     )
