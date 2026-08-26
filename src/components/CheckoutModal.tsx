@@ -58,8 +58,11 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
       setActiveTab('auth')
       
       if (prefilledData) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUsername(prefilledData.username)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCustomMessage(prefilledData.message)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setWebsiteUrl(prefilledData.link)
       }
     }
@@ -199,7 +202,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
             👑
           </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-            You're #1.
+            You&apos;re #1.
           </h1>
           <p className="text-lg text-gray-500 font-medium mb-8">
             <span className="font-semibold text-[var(--foreground)]">@{victoryDetails.previousUser}</span> has been replaced.
@@ -262,7 +265,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
         <div className="flex-1 p-8 md:p-10 border-b lg:border-b-0 lg:border-r border-[var(--border-soft)]">
           <div className="mb-8">
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-              You're replacing @{currentUsername}
+              You&apos;re replacing @{currentUsername}
             </h2>
             <p className="text-gray-500 text-sm">
               Take the top spot for <span className="font-semibold text-[var(--foreground)]">${currentPrice.toFixed(2)}</span>
@@ -447,7 +450,7 @@ export function CheckoutModal({ isOpen, onClose, currentPrice, currentUsername, 
             </div>
 
             <div className="text-sm font-medium text-[var(--foreground)] mb-4 italic break-words">
-              "{customMessage || 'Your message will appear here.'}"
+              &quot;{customMessage || 'Your message will appear here.'}&quot;
             </div>
 
             {websiteUrl && (

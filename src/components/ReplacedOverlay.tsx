@@ -18,6 +18,7 @@ export function ReplacedOverlay() {
 
   useEffect(() => {
     if (!notification || notification.type !== 'replaced' || !user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails(null)
       return
     }
@@ -36,7 +37,7 @@ export function ReplacedOverlay() {
         .single()
 
       if (!error && data) {
-        const newUser = data.new_user as any
+        const newUser = data.new_user as unknown as { username: string }
         setDetails({
           newUsername: newUser?.username || 'someone',
           amountPaid: Number(data.amount_paid),

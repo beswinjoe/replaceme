@@ -43,7 +43,7 @@ export interface Payment {
   amount: number
   status: 'pending' | 'succeeded' | 'failed'
   replacement_id: string | null
-  metadata: Record<string, any> | null
+  metadata: Record<string, unknown> | null
   created_at: string
 }
 

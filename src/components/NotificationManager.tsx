@@ -11,6 +11,7 @@ export function NotificationManager() {
 
   useEffect(() => {
     if (notification && notification.type === 'achievement') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowToast(true)
       // Auto-hide after 6 seconds
       const timer = setTimeout(() => {

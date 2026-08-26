@@ -94,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 3. Real-time Notification listener for the logged-in user
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotification(null)
       return
     }
@@ -139,8 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       if (error) throw error
       return { success: true }
-    } catch (err: any) {
-      return { success: false, error: err.message }
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message }
     }
   }
 
@@ -180,9 +181,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Demo login failed:', err)
-      return { success: false, error: err.message }
+      return { success: false, error: (err as Error).message }
     }
   }
 
