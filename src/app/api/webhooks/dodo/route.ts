@@ -59,10 +59,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
       }
 
+      // Always trust our quoted USD price from metadata to avoid currency conversion exploits/bugs
       const rawAmount = data.total_amount !== undefined ? data.total_amount : data.amount
-      const amountPaid = Number(rawAmount || 0) / 100 // Convert cents back to dollars
+      const dodoProcessedAmount = Number(rawAmount || 0) / 100 // Might be in local currency (e.g. INR)
       
-      console.log('Webhook parsed amount:', { rawAmount, amountPaid })
+      const amountPaid = metadata.quoted_price ? Number(metadata.quoted_price) : dodoProcessedAmount
+      
+      console.log('Webhook parsed amount:', { rawAmount, dodoProcessedAmount, amountPaid, quoted_price: metadata.quoted_price })
 
       const websiteUrl = metadata.website_url
       const websiteName = metadata.website_name || websiteUrl
