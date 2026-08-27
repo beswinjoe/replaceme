@@ -75,7 +75,8 @@ export async function POST(req: Request) {
       const supabaseAdmin = createAdminClient()
 
       // 1. Call the TS replacement processor (bypassing broken DB RPC)
-      const paymentId = data.payment_id || data.transaction_id || data.session_id || 'unknown'
+      // IMPORTANT: Use metadata.payment_id first, because the frontend success page polls for this UUID!
+      const paymentId = metadata.payment_id || data.payment_id || data.transaction_id || data.session_id || 'unknown'
       let replaceData: any
       try {
         replaceData = await processPaymentAndReplace({
