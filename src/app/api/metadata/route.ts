@@ -24,18 +24,33 @@ function resolveUrl(relativeUrl: string, baseUrl: URL): string {
 }
 
 // Check reachability and verify it's an image
-async function checkReachability(url: string): Promise<boolean> {
+async function checkReachability(url: string, isOgImage: boolean): Promise<boolean> {
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 2000)
-    const res = await fetch(url, { method: 'HEAD', signal: controller.signal })
+    const timeout = setTimeout(() => controller.abort(), 3000)
+    // We use GET because some servers don't return content-length on HEAD
+    const res = await fetch(url, { method: 'GET', signal: controller.signal })
     clearTimeout(timeout)
+    
     if (res.ok) {
        const ct = res.headers.get('content-type')
-       if (ct && (ct.startsWith('image/') || ct === 'application/octet-stream' || ct === 'image/svg+xml')) {
-         return true
-       }
        if (ct && ct.includes('text/html')) return false
+       
+       // Check for known Next.js/Vercel default logos by exact size signature
+       // The Vercel triangle (icon.tsx) is exactly 513 bytes
+       // The Vercel favicon.ico is exactly 25931 bytes
+       if (!isOgImage) {
+         try {
+           const buffer = await res.arrayBuffer()
+           const size = buffer.byteLength
+           if (size === 513 || size === 25931 || size === 0) {
+             return false // Reject known platform defaults
+           }
+         } catch {
+           // ignore buffer read errors
+         }
+       }
+       
        return true
     }
   } catch {
@@ -209,10 +224,10 @@ export async function GET(request: NextRequest) {
         
         if (cand.isFaviconIco && !cand.isPlatformDefault) cand.score += 10 // Last resort for favicons
 
-        // OpenGraph images are usually wide banners (1200x630). 
-        // We only want to use them if no other proper icon exists.
+        // OpenGraph images are wide, so we don't want them overriding real icons.
+        // But they are much better than falling back to initials.
         if (cand.isOgImage) {
-          cand.score -= 1000 // Heavily penalize so proper icons always win
+          cand.score -= 50 // Slight penalty so icons win, but still higher than -1000
         }
       }
 
@@ -225,7 +240,7 @@ export async function GET(request: NextRequest) {
 
       // 4. Test Reachability Sequentially
       for (const cand of candidates) {
-        if (await checkReachability(cand.url)) {
+        if (await checkReachability(cand.url, cand.isOgImage)) {
           // If it's a known platform default (e.g. Next.js generic favicon), fallback instead
           if (cand.isPlatformDefault && cand.score! < -1000) {
             break // go to fallback
