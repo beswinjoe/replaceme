@@ -438,10 +438,7 @@ function HomeContent() {
       return
     }
 
-    if (!quickMessage) {
-      setQuickError('Your claim message is required.')
-      return
-    }
+
     
     setLoadingPayment(true)
     setQuickError('')
