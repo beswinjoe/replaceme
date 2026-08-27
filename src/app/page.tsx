@@ -34,7 +34,7 @@ function HeroSection({
   websiteStatus,
 }: any) {
   const bidNum = Number(quickBidAmount)
-  const hasValidBid = !isNaN(bidNum) && bidNum >= 0.10
+  const hasValidBid = !isNaN(bidNum) && bidNum >= 1.00
 
   return (
     <section className="w-full flex flex-col items-center mt-6 md:mt-10 mb-8 md:mb-12">
@@ -49,7 +49,7 @@ function HeroSection({
         Join the ranking.
       </h1>
       <p className="text-sm md:text-base text-gray-500 font-medium mb-8">
-        Bid any amount. Higher bids rank higher. Minimum $0.10.
+        Bid any amount. Higher bids rank higher. Minimum $1.00.
       </p>
 
       <form 
@@ -83,9 +83,9 @@ function HeroSection({
           <span className="text-gray-400 font-medium mr-1">$</span>
           <input 
             type="number" 
-            min="0.10"
-            step="0.01"
-            placeholder="0.10" 
+            min="1.00"
+            step="1.00"
+            placeholder="1.00" 
             value={quickBidAmount}
             onChange={(e) => setQuickBidAmount(e.target.value)}
             className="w-full bg-transparent outline-none text-sm font-bold text-[#1a1a1a] placeholder-gray-400"
@@ -191,7 +191,7 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
           <div className="flex items-center gap-3 mt-1 sm:mt-1.5 text-[11px] font-medium text-gray-400">
              <span>{timeAgo(participant.created_at)}</span>
              <span className="text-gray-300">•</span>
-             <span className="flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> {participant.views_count || 0}</span>
+             <span className="flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> {participant.views_count || 0}</span>
              <span className="text-gray-300">•</span>
              <span className="flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg> {participant.clicks_count || 0}</span>
              <span className="sm:hidden text-gray-400 truncate">
@@ -433,8 +433,8 @@ function HomeContent() {
     }
     
     const bidNum = Number(quickBidAmount)
-    if (isNaN(bidNum) || bidNum < 0.10) {
-      setQuickError('Minimum bid is $0.10.')
+    if (isNaN(bidNum) || bidNum < 1.00) {
+      setQuickError('Minimum bid is $1.00.')
       return
     }
 

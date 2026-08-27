@@ -49,9 +49,9 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
           <p>Your payment may still be processing on the provider&apos;s end.</p>
           <p>Refresh this page in a moment to check again.</p>
         </div>
-        <Link href={`/checkout/success?payment_id=${sessionId}`} className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
+        <a href={`/checkout/success?payment_id=${sessionId}`} className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
           <RefreshCcw className="w-4 h-4" /> Refresh Status
-        </Link>
+        </a>
       </div>
     )
   }
@@ -126,9 +126,9 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
             <Share className="w-4 h-4" /> Share your rank
           </a>
           
-          <Link href="/" className="inline-flex items-center justify-center gap-2 w-full text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors py-2">
+          <a href="/" className="inline-flex items-center justify-center gap-2 w-full text-[var(--secondary)] hover:text-[var(--foreground)] font-medium text-sm transition-colors py-2">
             <ArrowLeft className="w-4 h-4" /> Return to leaderboard
-          </Link>
+          </a>
         </div>
       </div>
     )
@@ -142,9 +142,9 @@ async function PaymentStatus({ sessionId }: { sessionId: string }) {
       </div>
       <h2 className="text-xl font-bold mb-2 text-[var(--foreground)] uppercase">Payment Status: {paymentRecord.status}</h2>
       <p className="text-sm text-[var(--secondary)] mb-6">Something went wrong or the payment failed.</p>
-      <Link href="/" className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
+      <a href="/" className="inline-flex items-center justify-center gap-2 bg-[var(--surface-elevated)] border border-[var(--border-soft)] text-[var(--foreground)] px-8 py-3 rounded-full font-bold text-sm hover:bg-[var(--border-soft)] transition-colors w-full sm:w-auto uppercase tracking-wide">
         Return Home
-      </Link>
+      </a>
     </div>
   )
 }
@@ -157,7 +157,7 @@ export default async function CheckoutSuccessPage({ searchParams }: SuccessPageP
       <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[var(--foreground)] mb-4">Invalid Session</h1>
-          <Link href="/" className="text-[var(--accent)] hover:underline">Return Home</Link>
+          <a href="/" className="text-[var(--accent)] hover:underline">Return Home</a>
         </div>
       </div>
     )
