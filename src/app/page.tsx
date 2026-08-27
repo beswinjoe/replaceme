@@ -31,9 +31,10 @@ function HeroSection({
   estimatedRank,
   loadingPayment,
   loadingRank,
+  websiteStatus,
 }: any) {
   const bidNum = Number(quickBidAmount)
-  const hasBid = !isNaN(bidNum) && bidNum > 0
+  const hasValidBid = !isNaN(bidNum) && bidNum >= 1.00
 
   return (
     <section className="w-full flex flex-col items-center mt-6 md:mt-10 mb-8 md:mb-12">
@@ -93,28 +94,40 @@ function HeroSection({
 
         <button 
           type="submit"
-          disabled={loadingPayment}
+          disabled={loadingPayment || websiteStatus !== 'valid' || !hasValidBid}
           className="bg-[#1a1a1a] text-white px-6 py-2 rounded-xl md:rounded-full text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loadingPayment ? '...' : hasBid ? `Join for $${bidNum.toFixed(2)}` : 'Join'}
+          {loadingPayment ? '...' : 
+           websiteStatus === 'checking' ? 'Checking...' :
+           (websiteStatus === 'valid' && hasValidBid) ? `Join for $${bidNum.toFixed(2)}` : 'Join'}
         </button>
       </form>
       
-      <div className="mt-3 flex flex-col items-center justify-center min-h-[20px]">
+      <div className="mt-3 flex flex-col items-center justify-center min-h-[50px] gap-1">
         {quickError ? (
           <div className="text-[#e2735a] font-semibold text-xs">
             {quickError}
           </div>
-        ) : estimatedRank !== null ? (
-          <div className="text-gray-500 text-xs font-medium">
-            {loadingRank ? (
-              <span className="text-gray-400">Estimating rank…</span>
-            ) : (
-              <>Estimated rank <strong className="text-[#1a1a1a]">#{estimatedRank}</strong> — confirmed after payment.</>
-            )}
+        ) : websiteStatus === 'valid' ? (
+          <div className="text-green-600 font-semibold text-xs flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+            Website verified
           </div>
         ) : (
           <div className="text-transparent text-xs select-none" aria-hidden>.</div>
+        )}
+        
+        {estimatedRank !== null && websiteStatus === 'valid' && hasValidBid && (
+          <div className="flex flex-col items-center mt-1">
+            {loadingRank ? (
+              <span className="text-gray-400 text-xs font-medium">Estimating rank…</span>
+            ) : (
+              <>
+                <div className="text-sm font-bold text-[#1a1a1a]">Estimated rank: #{estimatedRank}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">Final rank is confirmed after payment.</div>
+              </>
+            )}
+          </div>
         )}
       </div>
     </section>
@@ -222,6 +235,12 @@ function HomeContent() {
   const [quickBidAmount, setQuickBidAmount] = useState('')
   const [quickError, setQuickError] = useState('')
 
+  // Website Validation State
+  const [websiteStatus, setWebsiteStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
+  const [websiteVerifiedUrl, setWebsiteVerifiedUrl] = useState('')
+  const [websiteMetadata, setWebsiteMetadata] = useState<any>(null)
+  const validationDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
   // Server-side estimated rank
   const [estimatedRank, setEstimatedRank] = useState<number | null>(null)
   const [loadingRank, setLoadingRank] = useState(false)
@@ -251,7 +270,7 @@ function HomeContent() {
   // Fetch estimated rank from server when bid amount changes
   useEffect(() => {
     const amount = Number(quickBidAmount)
-    if (isNaN(amount) || amount <= 0) {
+    if (isNaN(amount) || amount < 1 || websiteStatus !== 'valid') {
       setEstimatedRank(null)
       return
     }
@@ -277,7 +296,62 @@ function HomeContent() {
     return () => {
       if (rankDebounceRef.current) clearTimeout(rankDebounceRef.current)
     }
-  }, [quickBidAmount])
+  }, [quickBidAmount, websiteStatus])
+
+  // Real-time Website Validation
+  useEffect(() => {
+    if (!quickWebsiteUrl || quickWebsiteUrl.trim() === '') {
+      setWebsiteStatus('idle')
+      setWebsiteVerifiedUrl('')
+      setWebsiteMetadata(null)
+      setQuickError('')
+      if (validationDebounceRef.current) clearTimeout(validationDebounceRef.current)
+      return
+    }
+
+    // Simple client-side check before firing network requests
+    let urlToTest = quickWebsiteUrl
+    try {
+      urlToTest = quickWebsiteUrl.startsWith('http') ? quickWebsiteUrl : `https://${quickWebsiteUrl}`
+      new URL(urlToTest)
+    } catch {
+      setWebsiteStatus('invalid')
+      setQuickError('Enter a valid, reachable website')
+      return
+    }
+
+    // If it's the exact same URL we already verified, don't re-check
+    if (urlToTest === websiteVerifiedUrl && websiteStatus === 'valid') {
+      return
+    }
+
+    setWebsiteStatus('checking')
+    setQuickError('')
+
+    if (validationDebounceRef.current) clearTimeout(validationDebounceRef.current)
+
+    validationDebounceRef.current = setTimeout(async () => {
+      try {
+        const metaRes = await fetch(`/api/metadata?url=${encodeURIComponent(urlToTest)}`)
+        if (metaRes.ok) {
+          const metaData = await metaRes.json()
+          setWebsiteMetadata(metaData)
+          setWebsiteVerifiedUrl(urlToTest)
+          setWebsiteStatus('valid')
+        } else {
+          setWebsiteStatus('invalid')
+          setQuickError('Enter a valid, reachable website')
+        }
+      } catch (err) {
+        setWebsiteStatus('invalid')
+        setQuickError('Enter a valid, reachable website')
+      }
+    }, 800) // 800ms debounce to avoid firing while typing
+
+    return () => {
+      if (validationDebounceRef.current) clearTimeout(validationDebounceRef.current)
+    }
+  }, [quickWebsiteUrl])
 
   const fetchGameState = useCallback(async (page: number, isInitial = false) => {
     try {
@@ -330,19 +404,8 @@ function HomeContent() {
 
   const triggerCheckout = async (e?: FormEvent) => {
     if (e) e.preventDefault()
-    setQuickError('')
     
-    if (!quickWebsiteUrl) {
-      setQuickError('Please enter a website URL.')
-      return
-    }
-    
-    let urlToTest = quickWebsiteUrl
-    try {
-      urlToTest = quickWebsiteUrl.startsWith('http') ? quickWebsiteUrl : `https://${quickWebsiteUrl}`
-      new URL(urlToTest)
-    } catch {
-      setQuickError('Please enter a valid website URL.')
+    if (websiteStatus !== 'valid') {
       return
     }
     
@@ -358,29 +421,20 @@ function HomeContent() {
     }
     
     setLoadingPayment(true)
+    setQuickError('')
 
     try {
-      // 1. Resolve Identity Metadata
-      const domain = new URL(urlToTest).hostname.replace(/^www\./, '')
-      const nameFallback = domain.split('.')[0]
-      const capitalizedFallback = nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)
-      
-      let finalName = capitalizedFallback
-      let finalLogo = `/api/avatar/${encodeURIComponent(domain)}`
-      let finalSource = 'fallback'
+      // 1. Use the already validated metadata from state
+      let finalName = websiteMetadata?.websiteName
+      let finalLogo = websiteMetadata?.logoUrl
+      let finalSource = websiteMetadata?.logoSource
+      const domain = websiteMetadata?.domain || new URL(websiteVerifiedUrl).hostname.replace(/^www\./, '')
 
-      try {
-        const metaRes = await fetch(`/api/metadata?url=${encodeURIComponent(urlToTest)}`)
-        if (metaRes.ok) {
-          const metaData = await metaRes.json()
-          if (metaData.websiteName) finalName = metaData.websiteName
-          if (metaData.logoUrl) {
-            finalLogo = metaData.logoUrl
-            finalSource = metaData.logoSource || 'detected'
-          }
-        }
-      } catch (err) {
-        console.warn('Metadata resolution failed, using fallbacks.')
+      if (!finalName) {
+        const nameFallback = domain.split('.')[0]
+        finalName = nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)
+        finalLogo = `/api/avatar/${encodeURIComponent(domain)}`
+        finalSource = 'fallback'
       }
 
       const payload = {
@@ -514,7 +568,7 @@ function HomeContent() {
         
         <HeroSection 
           quickWebsiteUrl={quickWebsiteUrl}
-          setQuickWebsiteUrl={(val: string) => { setQuickWebsiteUrl(val); setQuickError(''); }}
+          setQuickWebsiteUrl={(val: string) => { setQuickWebsiteUrl(val); }}
           quickMessage={quickMessage}
           setQuickMessage={(val: string) => { setQuickMessage(val); setQuickError(''); }}
           quickBidAmount={quickBidAmount}
@@ -524,6 +578,7 @@ function HomeContent() {
           estimatedRank={estimatedRank}
           loadingPayment={loadingPayment}
           loadingRank={loadingRank}
+          websiteStatus={websiteStatus}
         />
 
         <section className="w-full">

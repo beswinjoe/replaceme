@@ -323,8 +323,10 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (e) {
-    // Ignore fetch errors, fallback below
+    // If the initial fetch throws, it means DNS failed, connection refused, or timeout.
+    // The domain is unreachable or fake.
     console.error(`Metadata fetch error for ${cleanDomain}:`, e)
+    return NextResponse.json({ error: 'Unreachable website' }, { status: 400 })
   }
 
   // --- 5. Fallback ---
