@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { processPaymentAndReplace } from '@/utils/supabase/paymentProcessing'
 
 export async function POST(req: Request) {
   try {
@@ -22,22 +23,19 @@ export async function POST(req: Request) {
     const supabaseAdmin = createAdminClient()
     const sessionId = `demo_${Math.random().toString(36).substring(7)}`
 
-    // Call atomic replacement function with the user's chosen bid amount
-    const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
-      'process_payment_and_replace',
-      {
-        p_payment_id: sessionId,
-        p_new_website_url: website_url,
-        p_new_website_name: website_name || website_url,
-        p_new_website_logo: website_logo || '',
-        p_amount_paid: amountPaid,
-        p_custom_message: custom_message || null,
-        p_metadata: body,
-        p_logo_source: logo_source || 'fallback'
-      }
-    )
-
-    if (replaceError) {
+    // Call TS replacement processor directly
+    let replaceData: any
+    try {
+      replaceData = await processPaymentAndReplace({
+        paymentId: sessionId,
+        newWebsiteUrl: website_url,
+        newWebsiteName: website_name || website_url,
+        newWebsiteLogo: website_logo || '',
+        amountPaid,
+        customMessage: custom_message || null,
+        metadata: body
+      })
+    } catch (replaceError: any) {
       console.error('Atomic replacement failed in demo:', replaceError)
       return NextResponse.json({ error: replaceError.message }, { status: 500 })
     }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import DodoPayments from 'dodopayments'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { processPaymentAndReplace } from '@/utils/supabase/paymentProcessing'
 
 export async function POST(req: Request) {
   try {
@@ -70,22 +71,20 @@ export async function POST(req: Request) {
 
       const supabaseAdmin = createAdminClient()
 
-      // 1. Call the atomic database replacement transaction
+      // 1. Call the TS replacement processor (bypassing broken DB RPC)
       const paymentId = data.payment_id || data.transaction_id || data.session_id || 'unknown'
-      const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
-        'process_payment_and_replace',
-        {
-          p_payment_id: paymentId,
-          p_new_website_url: websiteUrl,
-          p_new_website_name: websiteName,
-          p_new_website_logo: websiteLogo,
-          p_amount_paid: amountPaid,
-          p_custom_message: customMessage || null,
-          p_metadata: metadata
-        }
-      )
-
-      if (replaceError) {
+      let replaceData: any
+      try {
+        replaceData = await processPaymentAndReplace({
+          paymentId,
+          newWebsiteUrl: websiteUrl,
+          newWebsiteName: websiteName,
+          newWebsiteLogo: websiteLogo,
+          amountPaid,
+          customMessage: customMessage || null,
+          metadata
+        })
+      } catch (replaceError) {
         console.error('Atomic replacement failed in webhook:', replaceError)
         return NextResponse.json({ error: 'Atomic replacement failed' }, { status: 500 })
       }
