@@ -44,7 +44,7 @@ function HeroSection({
         </span>
       </div>
       
-      <h1 className="text-3xl md:text-[40px] font-bold tracking-tight text-[#1a1a1a] dark:text-white mb-2 leading-tight">
+      <h1 className="text-3xl md:text-[40px] font-bold tracking-tight text-[#1a1a1a] mb-2 leading-tight">
         Join the ranking.
       </h1>
       <p className="text-sm md:text-base text-gray-500 font-medium mb-8">
@@ -54,31 +54,31 @@ function HeroSection({
       <form 
         onSubmit={triggerCheckout}
         noValidate
-        className="w-full max-w-4xl bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 rounded-2xl md:rounded-full p-2 flex flex-col md:flex-row gap-2 shadow-sm focus-within:border-gray-300 dark:focus-within:border-gray-700 transition-colors relative"
+        className="w-full max-w-4xl bg-white border border-gray-200 rounded-2xl md:rounded-full p-2 flex flex-col md:flex-row gap-2 shadow-sm focus-within:border-gray-300 transition-colors relative"
       >
-        <div className="flex-[1.2] flex items-center bg-white dark:bg-[#111] rounded-xl md:rounded-full px-4 py-2 border border-transparent md:border-r-gray-100 dark:md:border-r-gray-800">
+        <div className="flex-[1.2] flex items-center bg-white rounded-xl md:rounded-full px-4 py-2 border border-transparent md:border-r-gray-100">
           <Globe className="w-4 h-4 text-gray-400 mr-2 shrink-0" />
           <input 
             type="url" 
             placeholder="https://yourwebsite.com" 
             value={quickWebsiteUrl}
             onChange={(e) => setQuickWebsiteUrl(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm text-[#1a1a1a] dark:text-white placeholder-gray-400 font-medium"
+            className="w-full bg-transparent outline-none text-sm text-[#1a1a1a] placeholder-gray-400 font-medium"
           />
         </div>
 
-        <div className="flex-[1.5] flex items-center bg-white dark:bg-[#111] rounded-xl md:rounded-full px-4 py-2 border border-transparent md:border-r-gray-100 dark:md:border-r-gray-800">
+        <div className="flex-[1.5] flex items-center bg-white rounded-xl md:rounded-full px-4 py-2 border border-transparent md:border-r-gray-100">
           <input 
             type="text" 
             placeholder="Your claim (optional)" 
             value={quickMessage}
             onChange={(e) => setQuickMessage(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm text-[#1a1a1a] dark:text-white placeholder-gray-400 font-medium"
+            className="w-full bg-transparent outline-none text-sm text-[#1a1a1a] placeholder-gray-400 font-medium"
             maxLength={100}
           />
         </div>
 
-        <div className="w-full md:w-32 flex items-center bg-white dark:bg-[#111] rounded-xl md:rounded-full px-4 py-2 relative">
+        <div className="w-full md:w-32 flex items-center bg-white rounded-xl md:rounded-full px-4 py-2 relative">
           <span className="text-gray-400 font-medium mr-1">$</span>
           <input 
             type="number" 
@@ -87,16 +87,16 @@ function HeroSection({
             placeholder="5.00" 
             value={quickBidAmount}
             onChange={(e) => setQuickBidAmount(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm font-bold text-[#1a1a1a] dark:text-white placeholder-gray-400"
+            className="w-full bg-transparent outline-none text-sm font-bold text-[#1a1a1a] placeholder-gray-400"
           />
         </div>
 
         <button 
           type="submit"
           disabled={loadingPayment}
-          className="bg-[#1a1a1a] dark:bg-white text-white dark:text-[#1a1a1a] px-6 py-2 rounded-xl md:rounded-full text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-[#1a1a1a] text-white px-6 py-2 rounded-xl md:rounded-full text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loadingPayment ? '...' : hasBid ? `Join for $${bidNum}` : 'Join'}
+          {loadingPayment ? '...' : hasBid ? `Join for $${bidNum.toFixed(2)}` : 'Join'}
         </button>
       </form>
       
@@ -110,7 +110,7 @@ function HeroSection({
             {loadingRank ? (
               <span className="text-gray-400">Estimating rank…</span>
             ) : (
-              <>Estimated rank <strong className="text-[#1a1a1a] dark:text-white">#{estimatedRank}</strong> — confirmed after payment.</>
+              <>Estimated rank <strong className="text-[#1a1a1a]">#{estimatedRank}</strong> — confirmed after payment.</>
             )}
           </div>
         ) : (
@@ -127,7 +127,7 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
   const initial = (participant.new_website_name || domain || '?').charAt(0).toUpperCase()
   
   return (
-    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800/50 bg-white dark:bg-black hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors ${isNumberOne ? 'bg-orange-50/20 dark:bg-orange-950/10' : ''}`}>
+    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 border-b border-gray-100 bg-white hover:bg-gray-50/50 transition-colors ${isNumberOne ? 'bg-orange-50/20' : ''}`}>
       
       <div className="flex items-center gap-4 sm:gap-6 min-w-0 w-full sm:w-auto mb-3 sm:mb-0">
         <div className="flex justify-center w-8 shrink-0">
@@ -140,17 +140,17 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
           <img
             src={participant.new_website_logo}
             alt={participant.new_website_name}
-            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain border border-gray-100 dark:border-gray-800 shrink-0 bg-white dark:bg-black"
+            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain border border-gray-100 shrink-0 bg-white"
           />
         ) : (
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-gray-100 dark:border-gray-800 shrink-0 bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-500 font-bold text-base select-none">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-gray-100 shrink-0 bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-base select-none">
             {initial}
           </div>
         )}
 
         <div className="flex flex-col min-w-0">
           <div className="flex items-baseline gap-2 truncate">
-            <span className="text-[15px] sm:text-[16px] font-bold text-[#1a1a1a] dark:text-white truncate">
+            <span className="text-[15px] sm:text-[16px] font-bold text-[#1a1a1a] truncate">
               {participant.new_website_name}
             </span>
             <span className="hidden sm:inline text-xs font-medium text-gray-400 truncate">
@@ -160,7 +160,7 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
           
           <div className="mt-0.5 truncate text-sm">
             {participant.custom_message ? (
-              <span className="text-[#1a1a1a] dark:text-white font-medium">
+              <span className="text-[#1a1a1a] font-medium">
                 {participant.custom_message}
               </span>
             ) : (
@@ -189,10 +189,10 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
 function PageSkeleton() {
   return (
     <div className="flex-1 flex flex-col items-center pt-8 pb-24 px-4 md:px-6 w-full animate-pulse">
-      <div className="w-full max-w-4xl h-16 bg-gray-100 dark:bg-gray-900 rounded-full mb-12" />
-      <div className="w-full max-w-4xl bg-white dark:bg-black border border-gray-100 dark:border-gray-800 rounded-3xl overflow-hidden">
+      <div className="w-full max-w-4xl h-16 bg-gray-100 rounded-full mb-12" />
+      <div className="w-full max-w-4xl bg-white border border-gray-100 rounded-3xl overflow-hidden">
          {[...Array(10)].map((_, i) => (
-           <div key={i} className="h-24 border-b border-gray-50 dark:border-gray-900 bg-white dark:bg-black" />
+           <div key={i} className="h-24 border-b border-gray-50 bg-white" />
          ))}
       </div>
     </div>
@@ -226,6 +226,27 @@ function HomeContent() {
   const [estimatedRank, setEstimatedRank] = useState<number | null>(null)
   const [loadingRank, setLoadingRank] = useState(false)
   const rankDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Stats
+  const [totalEarned, setTotalEarned] = useState(0)
+  const [launchAgeHours, setLaunchAgeHours] = useState(0)
+
+  // Fetch stats on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/stats')
+        if (res.ok) {
+          const data = await res.json()
+          setTotalEarned(data.totalEarned)
+          setLaunchAgeHours(data.launchAgeHours)
+        }
+      } catch (err) {
+        // silently fail stats
+      }
+    }
+    fetchStats()
+  }, [])
 
   // Fetch estimated rank from server when bid amount changes
   useEffect(() => {
@@ -412,7 +433,7 @@ function HomeContent() {
       <>
         <Header />
         <div className="flex-1 flex flex-col items-center justify-center pt-24 pb-24 text-center px-4">
-          <h2 className="text-[20px] font-bold text-[#1a1a1a] dark:text-white mb-2">We couldn&apos;t load the leaderboard.</h2>
+          <h2 className="text-[20px] font-bold text-[#1a1a1a] mb-2">We couldn&apos;t load the leaderboard.</h2>
           <button onClick={() => fetchGameState(1, true)} className="bg-white border border-gray-200 px-6 py-2 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors">
             Refresh Page
           </button>
@@ -446,7 +467,7 @@ function HomeContent() {
           <button 
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-900 disabled:opacity-30"
           >
             ‹
           </button>
@@ -461,7 +482,7 @@ function HomeContent() {
                 className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors ${
                   currentPage === p 
                     ? 'bg-[#e2735a] text-white' 
-                    : 'text-[#e2735a] hover:bg-orange-50 dark:hover:bg-orange-950/30'
+                    : 'text-[#e2735a] hover:bg-orange-50'
                 }`}
               >
                 {p}
@@ -489,7 +510,7 @@ function HomeContent() {
     <>
       <Header />
 
-      <main className="flex-1 flex flex-col items-center pt-2 pb-24 px-4 md:px-6 lg:px-8 max-w-5xl mx-auto w-full">
+      <main className="flex-1 flex flex-col items-center pt-2 pb-12 px-4 md:px-6 lg:px-8 max-w-5xl mx-auto w-full">
         
         <HeroSection 
           quickWebsiteUrl={quickWebsiteUrl}
@@ -507,13 +528,13 @@ function HomeContent() {
 
         <section className="w-full">
           {leaderboard.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 border border-gray-100 dark:border-gray-800 rounded-3xl bg-white dark:bg-[#111]">
+            <div className="text-center py-20 text-gray-500 border border-gray-100 rounded-3xl bg-white">
               The board is empty. Be the first to join the ranking!
             </div>
           ) : (
             <>
-              <div className="bg-white dark:bg-black rounded-3xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.02)] dark:shadow-none border border-gray-100 dark:border-gray-800">
-                <div className="border-b border-gray-100 dark:border-gray-800/50 px-6 sm:px-8 py-3 flex items-center justify-between">
+              <div className="bg-white rounded-3xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-gray-100">
+                <div className="border-b border-gray-100 px-6 sm:px-8 py-3 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Rank & Claim</span>
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Amount</span>
                 </div>
@@ -535,7 +556,7 @@ function HomeContent() {
                 </div>
                 <button 
                   onClick={() => fetchGameState(currentPage, false)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Refresh
@@ -544,6 +565,21 @@ function HomeContent() {
             </>
           )}
         </section>
+
+        {/* Total Earned Stats Section */}
+        {totalEarned > 0 && (
+          <section className="mt-16 mb-8 flex flex-col items-center justify-center text-center max-w-md w-full">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+              This simple side project made
+            </h3>
+            <div className="text-4xl md:text-5xl font-black text-[#1a1a1a] tracking-tight mb-2">
+              ${totalEarned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              since its launch {launchAgeHours} hours ago
+            </p>
+          </section>
+        )}
 
       </main>
     </>

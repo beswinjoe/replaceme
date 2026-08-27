@@ -6,8 +6,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const amountStr = searchParams.get('amount')
 
-    if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) <= 0) {
-      return NextResponse.json({ error: 'Valid amount is required' }, { status: 400 })
+    if (!amountStr || isNaN(Number(amountStr)) || Number(amountStr) < 1) {
+      return NextResponse.json({ error: 'Valid amount is required (minimum $1)' }, { status: 400 })
     }
 
     const amount = Number(amountStr)

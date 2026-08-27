@@ -1,23 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { Menu, X, Sun, Moon } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { useState } from 'react'
+import { Menu, X } from 'lucide-react'
 
 export function Header() {
-  const { theme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-        setMounted(true)
-  }, [])
-
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  }
 
   return (
     <header className="sticky top-0 z-40 w-full bg-[var(--surface)] border-b border-[var(--border)] h-[64px] md:h-[72px] flex items-center">
@@ -41,33 +29,10 @@ export function Header() {
             <Link href="/#how-it-works" className="hover:text-[var(--foreground)] transition-colors">
               How it works
             </Link>
-            
-            <div className="h-4 w-px bg-[var(--border)] mx-1" />
-
-            {/* Theme Toggle */}
-            {mounted && (
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors rounded-full hover:bg-[var(--background)]"
-                aria-label="Toggle theme"
-              >
-                {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-              </button>
-            )}
-
-
           </nav>
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-3 md:hidden">
-            {mounted && (
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors"
-              >
-                {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </button>
-            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-1.5 text-[var(--foreground)]"
@@ -102,11 +67,8 @@ export function Header() {
           >
             How it works
           </Link>
-
-
         </div>
       )}
     </header>
   )
 }
-

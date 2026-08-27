@@ -11,7 +11,7 @@
   --color-success: var(--success);
 }
 
-/* Light mode defaults */
+/* Light mode ONLY */
 :root {
   --background: #FAF9F7;
   --surface: #FFFFFF;
@@ -22,20 +22,6 @@
   --border: #E8E3DE;
   --border-featured: #F2A390;
   --accent: #E9785D;
-  --success: #20A84B;
-}
-
-/* Dark mode overrides */
-[data-theme='dark'] {
-  --background: #101010;
-  --surface: #171717;
-  --surface-featured: #1A1513;
-  --foreground: #F5F3EF;
-  --secondary: #9D9993;
-  --muted: #555555;
-  --border: #2A2A2A;
-  --border-featured: #4A2B23;
-  --accent: #D9694F; /* Muted coral/orange for dark mode */
   --success: #20A84B;
 }
 
@@ -67,4 +53,3 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
-
