@@ -10,19 +10,26 @@ interface SuccessPageProps {
 async function PaymentStatus({ sessionId }: { sessionId: string }) {
   const supabase = await createClient()
 
-  // Poll database for up to 10 seconds to allow webhook to process
+  // Handle array of payment IDs if Dodo appended its own
+  const idArray = Array.isArray(sessionId) ? sessionId : sessionId.split(',')
+  
   let paymentRecord = null
   for (let i = 0; i < 10; i++) {
-    const { data } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('metadata->metadata->>payment_id', sessionId)
-      .single()
-    
-    if (data) {
-      paymentRecord = data
-      break
+    // Check if any of the IDs match either dodo_payment_id or metadata->>payment_id
+    for (const id of idArray) {
+      const { data } = await supabase
+        .from('payments')
+        .select('*')
+        .or(`dodo_payment_id.eq.${id},metadata->>payment_id.eq.${id}`)
+        .maybeSingle()
+      
+      if (data) {
+        paymentRecord = data
+        break
+      }
     }
+    
+    if (paymentRecord) break
     await new Promise(resolve => setTimeout(resolve, 1000))
   }
 
