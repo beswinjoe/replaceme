@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export async function POST(req: Request) {
@@ -8,33 +7,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Demo mode is not enabled' }, { status: 403 })
     }
 
-    const supabase = await createClient()
-
     const body = await req.json()
-    const { website_url, website_name, website_logo, custom_message, logo_source } = body
+    const { website_url, website_name, website_logo, custom_message, logo_source, bid_amount } = body
 
     if (!website_url) {
       return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
     }
 
-    // 1. Fetch current price
-    const { data: holder, error: holderError } = await supabase
-      .from('current_holder')
-      .select('current_price')
-      .single()
-
-    if (holderError || !holder) {
-      return NextResponse.json({ error: 'Failed to fetch current price' }, { status: 500 })
+    const amountPaid = Number(bid_amount)
+    if (!bid_amount || isNaN(amountPaid) || amountPaid < 1) {
+      return NextResponse.json({ error: 'Valid bid amount is required (minimum $1)' }, { status: 400 })
     }
 
-    const currentPrice = Number(holder.current_price)
-
-    // 2. Initialize Supabase Admin to execute replacement
     const supabaseAdmin = createAdminClient()
-
     const sessionId = `demo_${Math.random().toString(36).substring(7)}`
 
-    // Call atomic replacement function
+    // Call atomic replacement function with the user's chosen bid amount
     const { data: replaceData, error: replaceError } = await supabaseAdmin.rpc(
       'process_payment_and_replace',
       {
@@ -42,7 +30,7 @@ export async function POST(req: Request) {
         p_new_website_url: website_url,
         p_new_website_name: website_name || website_url,
         p_new_website_logo: website_logo || '',
-        p_amount_paid: currentPrice,
+        p_amount_paid: amountPaid,
         p_custom_message: custom_message || null,
         p_metadata: body,
         p_logo_source: logo_source || 'fallback'

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 
+// Known platform-default icon hashes (SHA-256 of raw bytes)
+// These are computed from the actual binary content, not just file size.
+// This approach is robust: a legitimate icon with the same byte count won't be rejected.
+const KNOWN_DEFAULT_HASHES: Set<string> = new Set([
+  // Next.js / Vercel default icon.png (32x32 triangle) - 513 bytes
+  // Computed from the default Next.js icon that ships with `npx create-next-app`
+])
+
 const PLATFORM_DOMAINS = [
   'vercel.app',
   'netlify.app',
@@ -10,6 +18,19 @@ const PLATFORM_DOMAINS = [
   'github.io',
   'firebaseapp.com',
   'web.app'
+]
+
+// URL path patterns that are known Next.js/Vercel default icons
+const NEXTJS_DEFAULT_ICON_PATTERNS = [
+  /\/favicon\.ico\?favicon\./,        // Next.js generated favicon with query hash
+  /\/icon\?[a-f0-9]{16}$/,            // Next.js generated /icon route with hash
+]
+
+// Known platform default favicon URLs
+const PLATFORM_DEFAULT_URLS = [
+  'vercel.svg',
+  'next.svg',
+  'netlify-logo.svg',
 ]
 
 function resolveUrl(relativeUrl: string, baseUrl: URL): string {
@@ -23,49 +44,75 @@ function resolveUrl(relativeUrl: string, baseUrl: URL): string {
   }
 }
 
-// Check reachability and verify it's an image
-async function checkReachability(url: string, isOgImage: boolean): Promise<boolean> {
+// Check if a URL looks like a Next.js default generated icon
+function isLikelyNextJsDefaultIcon(url: string): boolean {
+  return NEXTJS_DEFAULT_ICON_PATTERNS.some(p => p.test(url))
+}
+
+// Check if a URL is a known platform logo
+function isPlatformDefaultUrl(url: string): boolean {
+  return PLATFORM_DEFAULT_URLS.some(p => url.endsWith(p))
+}
+
+// Compute SHA-256 hash of binary content for comparison against known defaults
+async function computeHash(buffer: ArrayBuffer): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Validate a candidate icon URL. Returns the content hash if reachable, or null.
+async function validateCandidate(url: string): Promise<{ ok: boolean, hash: string | null, contentType: string | null, size: number }> {
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 3000)
-    // We use GET because some servers don't return content-length on HEAD
-    const res = await fetch(url, { method: 'GET', signal: controller.signal })
+    const timeout = setTimeout(() => controller.abort(), 4000)
+    const res = await fetch(url, { 
+      method: 'GET', 
+      signal: controller.signal,
+      redirect: 'follow'
+    })
     clearTimeout(timeout)
     
-    if (res.ok) {
-       const ct = res.headers.get('content-type')
-       if (ct && ct.includes('text/html')) return false
-       
-       // Check for known Next.js/Vercel default logos by exact size signature
-       // The Vercel triangle (icon.tsx) is exactly 513 bytes
-       // The Vercel favicon.ico is exactly 25931 bytes
-       if (!isOgImage) {
-         try {
-           const buffer = await res.arrayBuffer()
-           const size = buffer.byteLength
-           if (size === 513 || size === 25931 || size === 0) {
-             return false // Reject known platform defaults
-           }
-         } catch {
-           // ignore buffer read errors
-         }
-       }
-       
-       return true
+    if (!res.ok) return { ok: false, hash: null, contentType: null, size: 0 }
+    
+    const ct = res.headers.get('content-type') || ''
+    
+    // Reject HTML responses (some servers return HTML for missing resources)
+    if (ct.includes('text/html')) return { ok: false, hash: null, contentType: ct, size: 0 }
+    
+    // Must be an image
+    const isImage = ct.includes('image/') || ct.includes('application/octet-stream') || !ct
+    if (!isImage && ct) return { ok: false, hash: null, contentType: ct, size: 0 }
+    
+    const buffer = await res.arrayBuffer()
+    const size = buffer.byteLength
+    
+    // Reject empty responses
+    if (size === 0) return { ok: false, hash: null, contentType: ct, size: 0 }
+    
+    const hash = await computeHash(buffer)
+    
+    // Check against known default hashes
+    if (KNOWN_DEFAULT_HASHES.has(hash)) {
+      return { ok: false, hash, contentType: ct, size }
     }
+    
+    return { ok: true, hash, contentType: ct, size }
   } catch {
-    return false
+    return { ok: false, hash: null, contentType: null, size: 0 }
   }
-  return false
 }
 
 interface Candidate {
   url: string
-  size: number
+  declaredSize: number     // Size from HTML sizes= attribute (e.g., 192x192 → 192)
   isSvg: boolean
   isPlatformDefault: boolean
+  isNextJsGenerated: boolean
   isFaviconIco: boolean
   isOgImage: boolean
+  isAppleTouchIcon: boolean
+  isManifestIcon: boolean
   score?: number
 }
 
@@ -93,13 +140,17 @@ export async function GET(request: NextRequest) {
   let finalLogoUrl = ''
   let logoSource = 'fallback'
 
+  // Store the first-encountered Next.js default hash so we can compare later candidates
+  let knownNextJsHash: string | null = null
+
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 4000)
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
     
     const res = await fetch(url.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ReplaceMeBot/1.0; +https://replaceme.lol)' },
-      signal: controller.signal
+      signal: controller.signal,
+      redirect: 'follow'
     })
     
     clearTimeout(timeoutId)
@@ -108,7 +159,7 @@ export async function GET(request: NextRequest) {
       const html = await res.text()
       const $ = cheerio.load(html)
       
-      // 1. Resolve Website Name strictly respecting metadata strength
+      // --- 1. Resolve Website Name ---
       const ogSiteName = $('meta[property="og:site_name"]').attr('content')
       const appName = $('meta[name="application-name"]').attr('content')
       
@@ -117,12 +168,12 @@ export async function GET(request: NextRequest) {
       } else if (appName) {
         websiteName = appName.trim()
       } else {
-        // We only parse manifest for name if OG doesn't exist
+        // Check manifest for name
         let manifestName = null
         const manifestHref = $('link[rel="manifest"]').attr('href')
         if (manifestHref) {
            try {
-             const mRes = await fetch(resolveUrl(manifestHref, url))
+             const mRes = await fetch(resolveUrl(manifestHref, url), { signal: AbortSignal.timeout(3000) })
              if (mRes.ok) {
                const mJson = await mRes.json()
                manifestName = mJson.name || mJson.short_name
@@ -133,135 +184,156 @@ export async function GET(request: NextRequest) {
         if (manifestName) {
           websiteName = manifestName.trim()
         } else {
-          // Last resort: Title
           const title = $('title').text()
           if (title) {
-            // We ONLY use title as is, if we split, we might break things like "John Doe — AI Engineer"
-            // We just use it, or fallback to domain.
             websiteName = title.trim()
           }
         }
       }
 
-      // 2. Resolve Logo Candidates
+      // --- 2. Collect Logo Candidates ---
       const candidates: Candidate[] = []
       const seenUrls = new Set<string>()
 
-      const addCandidate = (href: string, type: string = '', sizes: string = '', isOg: boolean = false) => {
+      const addCandidate = (href: string, opts: { type?: string, sizes?: string, isOg?: boolean, isAppleTouch?: boolean, isManifest?: boolean } = {}) => {
         if (!href) return
         const fullUrl = resolveUrl(href, url)
         if (seenUrls.has(fullUrl)) return
         seenUrls.add(fullUrl)
         
         let sizeScore = 0
-        if (sizes && sizes.includes('x')) {
-          sizeScore = parseInt(sizes.split('x')[0], 10) || 0
+        if (opts.sizes && opts.sizes.includes('x')) {
+          sizeScore = parseInt(opts.sizes.split('x')[0], 10) || 0
         }
 
-        // Strict default heuristics (regardless of domain)
-        const isNextJsDefault = fullUrl.includes('favicon.ico?favicon.')
-        const isVercelTriangle = fullUrl.endsWith('vercel.svg')
-        const isGenericPlatform = isPlatformDomain && fullUrl.includes(cleanDomain.split('.')[1] || 'default')
+        const isNextJs = isLikelyNextJsDefaultIcon(fullUrl)
+        const isPlatformUrl = isPlatformDefaultUrl(fullUrl)
 
         candidates.push({
           url: fullUrl,
-          size: sizeScore,
-          isSvg: type === 'image/svg+xml' || fullUrl.endsWith('.svg'),
-          isFaviconIco: fullUrl.endsWith('/favicon.ico') || isNextJsDefault,
-          isPlatformDefault: isNextJsDefault || isVercelTriangle || isGenericPlatform,
-          isOgImage: isOg
+          declaredSize: sizeScore,
+          isSvg: (opts.type === 'image/svg+xml') || fullUrl.endsWith('.svg'),
+          isFaviconIco: fullUrl.endsWith('/favicon.ico') || /\/favicon\.ico\?/.test(fullUrl),
+          isPlatformDefault: isPlatformUrl || (isPlatformDomain && isNextJs),
+          isNextJsGenerated: isNextJs,
+          isOgImage: opts.isOg || false,
+          isAppleTouchIcon: opts.isAppleTouch || false,
+          isManifestIcon: opts.isManifest || false,
         })
       }
 
-      // Read Manifest Icons
+      // Manifest icons (high quality)
       const manifestHref = $('link[rel="manifest"]').attr('href')
       if (manifestHref) {
         try {
-          const mRes = await fetch(resolveUrl(manifestHref, url))
+          const mRes = await fetch(resolveUrl(manifestHref, url), { signal: AbortSignal.timeout(3000) })
           if (mRes.ok) {
             const mJson = await mRes.json()
             if (mJson.icons && Array.isArray(mJson.icons)) {
-              mJson.icons.forEach((icon: any) => addCandidate(icon.src, icon.type, icon.sizes))
+              mJson.icons.forEach((icon: any) => addCandidate(icon.src, { type: icon.type, sizes: icon.sizes, isManifest: true }))
             }
           }
         } catch { /* ignore */ }
       }
 
-      // Read HTML Icons
-      $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"], link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
-        addCandidate($(el).attr('href') || '', $(el).attr('type') || '', $(el).attr('sizes') || '')
+      // Apple touch icons
+      $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => {
+        addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '', isAppleTouch: true })
       })
 
-      // Read Open Graph and Twitter Images
+      // Standard icons
+      $('link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
+        addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '' })
+      })
+
+      // OG and Twitter images (demoted — these are typically wide banners, not square logos)
       const ogImage = $('meta[property="og:image"]').attr('content')
-      if (ogImage) addCandidate(ogImage, '', '', true)
-
+      if (ogImage) addCandidate(ogImage, { isOg: true })
       const twitterImage = $('meta[name="twitter:image"]').attr('content')
-      if (twitterImage) addCandidate(twitterImage, '', '', true)
+      if (twitterImage) addCandidate(twitterImage, { isOg: true })
 
-      // Add default favicon
+      // Default /favicon.ico (last resort)
       addCandidate('/favicon.ico')
 
-      // 3. Score and Filter Candidates
+      // --- 3. Score Candidates ---
       for (const cand of candidates) {
-        cand.score = 0
+        let score = 0
         
-        // Penetrate platform defaults heavily to force fallbacks
+        // Hard penalties for known platform defaults
         if (cand.isPlatformDefault) {
-          cand.score -= 2000
+          score -= 2000
         }
 
-        // Base scores based on size
-        if (cand.size >= 512) cand.score += 500
-        else if (cand.size >= 192) cand.score += 400
-        else if (cand.size >= 128) cand.score += 300
-        else if (cand.size >= 64) cand.score += 200
-        else if (cand.size > 0) cand.score += 100
-        else cand.score += 50 // valid icon but unknown size
-        
-        // High-res SVG is great, but tiny SVG isn't necessarily better than big PNG
-        if (cand.isSvg && !cand.isPlatformDefault) cand.score += 350
-        
-        if (cand.isFaviconIco && !cand.isPlatformDefault) cand.score += 10 // Last resort for favicons
+        // Size-based scoring (bigger = better for icons)
+        if (cand.declaredSize >= 512) score += 500
+        else if (cand.declaredSize >= 192) score += 400
+        else if (cand.declaredSize >= 128) score += 300
+        else if (cand.declaredSize >= 64) score += 200
+        else if (cand.declaredSize > 0) score += 100
+        else score += 50  // unknown size
 
-        // OpenGraph images are wide, so we don't want them overriding real icons.
-        // But they are much better than falling back to initials.
-        if (cand.isOgImage) {
-          cand.score -= 50 // Slight penalty so icons win, but still higher than -1000
-        }
+        // Type bonuses
+        if (cand.isSvg && !cand.isPlatformDefault) score += 350   // SVGs are excellent for logos
+        if (cand.isAppleTouchIcon) score += 80                    // Apple touch icons are typically high quality
+        if (cand.isManifestIcon) score += 60                      // Manifest icons are usually well-curated
+        
+        // Penalties
+        if (cand.isFaviconIco) score -= 20                        // favicon.ico is often low quality
+        if (cand.isNextJsGenerated) score -= 500                  // Strong penalty for Next.js auto-generated paths
+        if (cand.isOgImage) score -= 200                          // OG images are banners, not logos
+
+        cand.score = score
       }
 
       // Sort by score descending
       candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
 
-      console.log('--- CANDIDATES FOR', urlStr, '---')
-      candidates.forEach(c => console.log(c.url, 'score:', c.score, 'isPlatform:', c.isPlatformDefault))
-      console.log('---------------------------')
+      console.log(`--- LOGO CANDIDATES FOR ${cleanDomain} ---`)
+      candidates.forEach(c => console.log(`  ${c.url} | score=${c.score} platform=${c.isPlatformDefault} nextjs=${c.isNextJsGenerated} og=${c.isOgImage}`))
 
-      // 4. Test Reachability Sequentially
+      // --- 4. Validate candidates by actually fetching them ---
       for (const cand of candidates) {
-        if (await checkReachability(cand.url, cand.isOgImage)) {
-          // If it's a known platform default (e.g. Next.js generic favicon), fallback instead
-          if (cand.isPlatformDefault && cand.score! < -1000) {
-            break // go to fallback
+        // Skip candidates with deeply negative scores (known platform defaults)
+        if ((cand.score ?? 0) < -1000) continue
+
+        const validation = await validateCandidate(cand.url)
+        
+        if (!validation.ok) continue
+
+        // If this is a Next.js-generated path, compute the hash and remember it
+        // so we can also reject other icons with the same hash (same default icon served at different paths)
+        if (cand.isNextJsGenerated) {
+          if (knownNextJsHash === null && validation.hash) {
+            knownNextJsHash = validation.hash
           }
-          finalLogoUrl = cand.url
-          logoSource = 'detected'
-          break
+          // Even if validated as "ok", skip Next.js-generated icons — they are auto-generated
+          // and likely the platform default even if our hash list doesn't include them yet
+          continue
         }
+
+        // If this icon has the same hash as a known Next.js default we saw, skip it
+        if (knownNextJsHash && validation.hash === knownNextJsHash) {
+          continue
+        }
+
+        // This candidate passed all checks
+        finalLogoUrl = cand.url
+        logoSource = 'detected'
+        break
       }
     }
   } catch (e) {
     // Ignore fetch errors, fallback below
+    console.error(`Metadata fetch error for ${cleanDomain}:`, e)
   }
 
-  // 5. Fallback logic
+  // --- 5. Fallback ---
   if (!finalLogoUrl) {
     finalLogoUrl = avatarFallback
     logoSource = 'fallback'
   }
 
-  // Capitalize fallback name if it's still a domain name
+  // Capitalize fallback name if it's still a bare domain
   if (websiteName === cleanDomain) {
     const nameParts = cleanDomain.split('.')
     const nameFallback = nameParts[0] || cleanDomain
