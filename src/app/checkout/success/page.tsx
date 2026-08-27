@@ -3,6 +3,9 @@ import { createClient } from '@/utils/supabase/server'
 import { Share, ArrowLeft, RefreshCcw } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface SuccessPageProps {
   searchParams: Promise<{ payment_id?: string }>
 }

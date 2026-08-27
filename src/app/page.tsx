@@ -140,13 +140,14 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
   const initial = (participant.new_website_name || domain || '?').charAt(0).toUpperCase()
   
   return (
-    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 border-b border-gray-100 bg-white hover:bg-gray-50/50 transition-colors ${isNumberOne ? 'bg-orange-50/20' : ''}`}>
+    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 transition-all ${isNumberOne ? 'shadow-[0_4px_32px_rgba(226,115,90,0.15)] border-b-2 border-b-[#e2735a]/20 bg-gradient-to-r from-orange-50/50 via-white to-white relative z-10' : 'border-b border-gray-100 bg-white hover:bg-gray-50/50'}`}>
       
       <div className="flex items-center gap-4 sm:gap-6 min-w-0 w-full sm:w-auto mb-3 sm:mb-0">
-        <div className="flex justify-center w-8 shrink-0">
+        <div className="flex flex-col items-center justify-center w-10 shrink-0">
           <span className={`text-sm sm:text-base font-bold ${isNumberOne ? 'text-[#e2735a]' : 'text-gray-400'}`}>
             #{rank}
           </span>
+          {isNumberOne && <span className="text-[10px] mt-0.5 animate-pulse">👑</span>}
         </div>
         
         {participant.new_website_logo ? (
@@ -183,6 +184,10 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
 
           <div className="flex items-center gap-3 mt-1 sm:mt-1.5 text-[11px] font-medium text-gray-400">
              <span>{timeAgo(participant.created_at)}</span>
+             <span className="text-gray-300">•</span>
+             <span className="flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> {participant.views_count || 0}</span>
+             <span className="text-gray-300">•</span>
+             <span className="flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg> {participant.clicks_count || 0}</span>
              <span className="sm:hidden text-gray-400 truncate">
                • {domain}
              </span>
