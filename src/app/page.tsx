@@ -1,8 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState, FormEvent, useCallback, useRef } from 'react'
+import { Suspense, useEffect, useState, FormEvent, useCallback } from 'react'
 import { Header } from '@/components/Header'
-import { CheckoutModal } from '@/components/CheckoutModal'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Clock, Globe, ArrowRight } from 'lucide-react'
@@ -30,7 +29,8 @@ function HeroSection({
   setQuickBidAmount,
   triggerCheckout,
   quickError,
-  leaderboard
+  leaderboard,
+  loadingPayment
 }: any) {
   // Estimate rank dynamically
   const estimatedRank = (() => {
@@ -103,9 +103,10 @@ function HeroSection({
 
         <button 
           type="submit"
-          className="bg-[var(--foreground)] text-[var(--background)] px-6 py-2.5 rounded-xl text-sm font-bold tracking-wide hover:opacity-90 transition-opacity whitespace-nowrap flex items-center justify-center gap-2"
+          disabled={loadingPayment}
+          className="bg-[var(--foreground)] text-[var(--background)] px-6 py-2.5 rounded-xl text-sm font-bold tracking-wide hover:opacity-90 transition-opacity whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Outbid <ArrowRight className="w-4 h-4" />
+          {loadingPayment ? 'Processing...' : 'Outbid'} {!loadingPayment && <ArrowRight className="w-4 h-4" />}
         </button>
       </form>
       
@@ -234,9 +235,9 @@ function HomeContent() {
   const [leaderboard, setLeaderboard] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingPayment, setLoadingPayment] = useState(false)
 
   // Quick form state
   const [quickWebsiteUrl, setQuickWebsiteUrl] = useState('')
@@ -343,13 +344,14 @@ function HomeContent() {
   }, [leaderboard])
 
   useEffect(() => {
+    // If checkout query param was passed, we no longer open a modal.
+    // Instead we clear it from the URL.
     if (searchParams.get('checkout') === 'true') {
-      setTimeout(() => setCheckoutOpen(true), 0)
       router.replace('/')
     }
   }, [searchParams, router])
 
-  const triggerCheckout = (e?: FormEvent) => {
+  const triggerCheckout = async (e?: FormEvent) => {
     if (e) e.preventDefault()
     setQuickError('')
     
@@ -358,8 +360,9 @@ function HomeContent() {
       return
     }
     
+    let urlToTest = quickWebsiteUrl
     try {
-      const urlToTest = quickWebsiteUrl.startsWith('http') ? quickWebsiteUrl : `https://${quickWebsiteUrl}`
+      urlToTest = quickWebsiteUrl.startsWith('http') ? quickWebsiteUrl : `https://${quickWebsiteUrl}`
       new URL(urlToTest)
     } catch {
       setQuickError('Please enter a valid website URL.')
@@ -371,8 +374,71 @@ function HomeContent() {
       setQuickError('Minimum bid is $1.00.')
       return
     }
+
+    if (!quickMessage) {
+      setQuickError('Your claim message is required.')
+      return
+    }
     
-    setCheckoutOpen(true)
+    setLoadingPayment(true)
+
+    try {
+      // 1. Resolve Identity Metadata
+      const domain = new URL(urlToTest).hostname.replace(/^www\./, '')
+      const nameFallback = domain.split('.')[0]
+      const capitalizedFallback = nameFallback.charAt(0).toUpperCase() + nameFallback.slice(1)
+      
+      let finalName = capitalizedFallback
+      let finalLogo = `/api/avatar/${encodeURIComponent(domain)}`
+      let finalSource = 'fallback'
+
+      try {
+        const metaRes = await fetch(`/api/metadata?url=${encodeURIComponent(urlToTest)}`)
+        if (metaRes.ok) {
+          const metaData = await metaRes.json()
+          if (metaData.websiteName) finalName = metaData.websiteName
+          if (metaData.logoUrl) {
+            finalLogo = metaData.logoUrl
+            finalSource = metaData.logoSource || 'detected'
+          }
+        }
+      } catch (err) {
+        console.warn('Metadata resolution failed, using fallbacks.')
+      }
+
+      const payload = {
+        website_url: domain,
+        website_name: finalName,
+        website_logo: finalLogo,
+        logo_source: finalSource,
+        custom_message: quickMessage,
+        bid_amount: bidNum.toFixed(2)
+      }
+
+      // 2. Initiate Checkout
+      const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+      const endpoint = isDemo ? '/api/checkout/demo' : '/api/checkout'
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const resData = await response.json()
+      
+      if (!response.ok) throw new Error(resData.error || 'Checkout session failed')
+
+      if (resData.url) {
+        window.location.href = resData.url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
+    } catch (err: any) {
+      console.error(err)
+      setQuickError(err.message || 'Payment initiation failed. Please try again.')
+    } finally {
+      setLoadingPayment(false)
+    }
   }
 
   if (loading) {
@@ -406,6 +472,7 @@ function HomeContent() {
           triggerCheckout={triggerCheckout}
           quickError={quickError}
           leaderboard={leaderboard}
+          loadingPayment={loadingPayment}
         />
 
         <section className="w-full">
@@ -453,17 +520,6 @@ function HomeContent() {
         </div>
 
       </main>
-
-      <CheckoutModal
-        isOpen={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        leaderboard={leaderboard}
-        prefilledData={{
-          websiteUrl: quickWebsiteUrl,
-          message: quickMessage,
-          bidAmount: quickBidAmount
-        }}
-      />
     </>
   )
 }
