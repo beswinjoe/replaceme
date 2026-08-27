@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Footer } from "@/components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,13 +62,7 @@ export default function RootLayout({
             <div className="flex-grow">
               {children}
             </div>
-            <div
-              className="fixed bottom-3 right-3 md:bottom-6 md:right-6 z-[40] px-4 py-2 bg-white/50 dark:bg-black/40 backdrop-blur-md border border-white/30 dark:border-white/10 rounded-full shadow-sm"
-            >
-              <span className="text-xs font-medium text-[var(--secondary)]">
-                Built by <a href="https://x.com/beswinjoee" target="_blank" rel="noopener noreferrer" className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent font-semibold hover:opacity-80 transition-opacity">@beswinjoee</a>
-              </span>
-            </div>
+            <Footer />
           </div>
         </Providers>
       </body>

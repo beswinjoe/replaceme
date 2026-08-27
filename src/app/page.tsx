@@ -238,6 +238,7 @@ function HomeContent() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingPayment, setLoadingPayment] = useState(false)
+  const [stats, setStats] = useState<{ totalAmount: number, hoursAgo: number } | null>(null)
 
   // Quick form state
   const [quickWebsiteUrl, setQuickWebsiteUrl] = useState('')
@@ -276,6 +277,27 @@ function HomeContent() {
           setHasMore(start + PAGE_SIZE < count)
         } else {
           setHasMore(data.length === PAGE_SIZE)
+        }
+
+        // Try fetching total stats
+        if (start === 0) {
+          try {
+            // If the user has added the get_leaderboard_stats RPC:
+            const { data: statsData, error: statsErr } = await supabase.rpc('get_leaderboard_stats')
+            if (!statsErr && statsData) {
+               const hours = statsData.launch_date 
+                 ? Math.max(1, Math.floor((new Date().getTime() - new Date(statsData.launch_date).getTime()) / (1000 * 60 * 60)))
+                 : 0
+               setStats({ totalAmount: Number(statsData.total_amount), hoursAgo: hours })
+            } else {
+               // Fallback to summing visible rows if RPC doesn't exist
+               const sum = (data || []).reduce((acc: number, val: any) => acc + Number(val.amount_paid || 0), 0)
+               setStats({ totalAmount: sum, hoursAgo: 24 })
+            }
+          } catch (e) {
+               const sum = (data || []).reduce((acc: number, val: any) => acc + Number(val.amount_paid || 0), 0)
+               setStats({ totalAmount: sum, hoursAgo: 24 })
+          }
         }
       }
       setError(false)
@@ -433,6 +455,7 @@ function HomeContent() {
       } else {
         throw new Error('No checkout URL returned')
       }
+
     } catch (err: any) {
       console.error(err)
       setQuickError(err.message || 'Payment initiation failed. Please try again.')
@@ -512,12 +535,23 @@ function HomeContent() {
             </div>
           )}
         </section>
-
-        <div className="pt-16 w-full flex justify-center">
-          <p className="text-[13px] text-[var(--muted)] font-medium">
-            Built by <a href="https://x.com/beswinjoee" target="_blank" rel="noreferrer" className="hover:text-[var(--foreground)] transition-colors underline underline-offset-4">@beswinjoee</a>
-          </p>
-        </div>
+        
+        {/* Statistics Block */}
+        {stats && (
+          <div className="mt-20 w-full flex flex-col items-center justify-center">
+            <p className="text-sm font-semibold text-[var(--muted)] mb-4 uppercase tracking-widest">
+              This simple side project made
+            </p>
+            <div className="bg-white dark:bg-black border border-[var(--border-soft)] shadow-xl shadow-black/5 dark:shadow-white/5 rounded-3xl px-12 py-6 mb-4 flex items-center justify-center transform hover:scale-[1.02] transition-transform">
+               <span className="text-5xl sm:text-6xl md:text-7xl font-black tabular-nums tracking-tighter text-[var(--foreground)] drop-shadow-sm">
+                  <span className="text-[#e2735a]">$</span>{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+               </span>
+            </div>
+            <p className="text-sm font-semibold text-[var(--muted)]">
+              since its launch {stats.hoursAgo.toLocaleString()} hours ago
+            </p>
+          </div>
+        )}
 
       </main>
     </>
