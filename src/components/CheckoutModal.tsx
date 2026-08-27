@@ -10,6 +10,7 @@ interface CheckoutModalProps {
   prefilledData?: {
     websiteUrl: string
     message: string
+    bidAmount?: string
   }
 }
 
@@ -33,6 +34,9 @@ export function CheckoutModal({ isOpen, onClose, leaderboard, prefilledData }: C
     if (prefilledData) {
       setWebsiteInput(prefilledData.websiteUrl)
       setCustomMessage(prefilledData.message)
+      if (prefilledData.bidAmount) {
+        setBidAmount(prefilledData.bidAmount)
+      }
     } else {
       setCustomMessage(`I just bid to join the ranking.`)
     }
@@ -262,46 +266,75 @@ export function CheckoutModal({ isOpen, onClose, leaderboard, prefilledData }: C
         </div>
 
         {/* RIGHT COLUMN: Live Preview */}
-        <div className="w-full lg:w-[380px] bg-[var(--surface-elevated)] p-8 md:p-10 flex flex-col justify-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">Preview</p>
+        <div className="w-full lg:w-[480px] bg-[var(--surface-elevated)] p-8 md:p-10 flex flex-col justify-center border-l border-[var(--border-soft)]">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">Live Preview</p>
 
-          <div className="bg-[var(--surface)] border border-[var(--border-soft)] rounded-2xl p-6 shadow-sm relative">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">👑</span>
-              <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                {estimatedRank ? `#${estimatedRank} ESTIMATED` : 'RANK'}
-              </span>
+          <div className="w-full bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-[var(--surface-elevated)] border-b border-[var(--border-soft)] px-4 py-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider">Rank & Claim</span>
+              <span className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider pr-2">Amount</span>
             </div>
-
-            <div className="flex items-center gap-4 mb-4">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt="website logo"
-                  className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 object-contain"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-lg border border-[var(--border-soft)] bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xs font-medium">
-                  URL
+            
+            <div className={`flex items-center justify-between p-4 bg-[var(--surface)] ${estimatedRank === 1 ? 'bg-[var(--surface-featured)]' : ''}`}>
+              
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <div className="flex flex-col items-center justify-center w-8 shrink-0">
+                  <span className={`text-lg font-bold ${estimatedRank === 1 ? 'text-[var(--accent)]' : 'text-[var(--muted)]'}`}>
+                    #{estimatedRank || '?'}
+                  </span>
                 </div>
-              )}
-              <div className="overflow-hidden">
-                <h4 className="font-bold text-[var(--foreground)] truncate max-w-[160px]">
-                  {websiteName || 'Website Name'}
-                </h4>
-                <p className="text-sm text-gray-500 truncate max-w-[160px]">
-                  {domain || 'website.com'}
-                </p>
-              </div>
-            </div>
+                
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="website logo"
+                    className="w-10 h-10 rounded-lg object-contain border border-[var(--border-soft)] shrink-0 bg-white dark:bg-black"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg border border-[var(--border-soft)] shrink-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 font-bold text-[10px]">
+                    URL
+                  </div>
+                )}
 
-            <div className="text-sm font-medium text-[var(--foreground)] mb-4 italic break-words">
-              &quot;{customMessage || 'Your claim will appear here.'}&quot;
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-baseline gap-2 truncate">
+                    <span className="text-sm sm:text-base font-bold text-[var(--foreground)] truncate">
+                      {websiteName || 'Website Name'}
+                    </span>
+                    <span className="hidden sm:inline text-[11px] text-[var(--secondary)] truncate">
+                      {domain || 'website.com'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mt-0.5 truncate">
+                    {customMessage ? (
+                      <span className="text-xs sm:text-sm text-[var(--foreground)] font-medium truncate max-w-[150px] sm:max-w-[200px]">
+                        {customMessage}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-[var(--accent)] hover:underline truncate">
+                        {domain || 'website.com'}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mt-1.5 text-[10px] text-[var(--muted)] font-medium">
+                     <span>Just now</span>
+                     <span className="flex items-center gap-1"><span className="w-1 h-1 bg-current rounded-full opacity-50" /> 0 views</span>
+                     <span className="flex items-center gap-1"><span className="w-1 h-1 bg-current rounded-full opacity-50" /> 0 clicks</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-end shrink-0 pl-2">
+                <span className={`text-lg sm:text-xl font-bold tabular-nums tracking-tight ${estimatedRank && estimatedRank <= 3 ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
+                  ${Number(bidAmount) ? Number(bidAmount).toFixed(2) : '0.00'}
+                </span>
+              </div>
             </div>
           </div>
           
           <div className="mt-8 text-center text-sm text-[var(--secondary)] font-medium">
-             <p>Estimated rank based on current bids.</p>
              <p>Your final rank is confirmed after payment.</p>
              <p className="mt-2 text-xs text-gray-400">Applicable taxes may be added by Dodo where required.</p>
           </div>
