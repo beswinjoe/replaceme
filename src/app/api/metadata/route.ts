@@ -1,102 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 
-// Known platform-default icon hashes (SHA-256 of raw bytes)
-// These are computed from the actual binary content, not just file size.
-// This approach is robust: a legitimate icon with the same byte count won't be rejected.
-const KNOWN_DEFAULT_HASHES: Set<string> = new Set([
-  // Next.js / Vercel default icon.png (32x32 triangle) - 513 bytes
-  // Computed from the default Next.js icon that ships with `npx create-next-app`
-])
+const KNOWN_DEFAULT_HASHES: Set<string> = new Set([])
 
 const PLATFORM_DOMAINS = [
-  'vercel.app',
-  'netlify.app',
-  'herokuapp.com',
-  'onrender.com',
-  'pages.dev',
-  'github.io',
-  'firebaseapp.com',
-  'web.app'
+  'vercel.app', 'netlify.app', 'herokuapp.com', 'onrender.com', 'pages.dev',
+  'github.io', 'firebaseapp.com', 'web.app'
 ]
 
-// URL path patterns that are known Next.js/Vercel default icons
 const NEXTJS_DEFAULT_ICON_PATTERNS = [
-  /\/favicon\.ico\?favicon\./,        // Next.js generated favicon with query hash
-  /\/icon\?[a-f0-9]{16}$/,            // Next.js generated /icon route with hash
+  /\/favicon\.ico\?favicon\./,
+  /\/icon\?[a-f0-9]{16}$/
 ]
 
-// Known platform default favicon URLs
 const PLATFORM_DEFAULT_URLS = [
-  'vercel.svg',
-  'next.svg',
-  'netlify-logo.svg',
+  'vercel.svg', 'next.svg', 'netlify-logo.svg'
 ]
 
 function resolveUrl(relativeUrl: string, baseUrl: URL): string {
   try {
-    if (relativeUrl.startsWith('//')) {
-      return `https:${relativeUrl}`
-    }
+    if (relativeUrl.startsWith('//')) return `https:${relativeUrl}`
     return new URL(relativeUrl, baseUrl).toString()
   } catch {
     return relativeUrl
   }
 }
 
-// Check if a URL looks like a Next.js default generated icon
 function isLikelyNextJsDefaultIcon(url: string): boolean {
   return NEXTJS_DEFAULT_ICON_PATTERNS.some(p => p.test(url))
 }
 
-// Check if a URL is a known platform logo
 function isPlatformDefaultUrl(url: string): boolean {
   return PLATFORM_DEFAULT_URLS.some(p => url.endsWith(p))
 }
 
-// Compute SHA-256 hash of binary content for comparison against known defaults
 async function computeHash(buffer: ArrayBuffer): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// Validate a candidate icon URL. Returns the content hash if reachable, or null.
 async function validateCandidate(url: string): Promise<{ ok: boolean, hash: string | null, contentType: string | null, size: number }> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 4000)
-    const res = await fetch(url, { 
-      method: 'GET', 
-      signal: controller.signal,
-      redirect: 'follow'
-    })
+    const res = await fetch(url, { method: 'GET', signal: controller.signal, redirect: 'follow' })
     clearTimeout(timeout)
-    
     if (!res.ok) return { ok: false, hash: null, contentType: null, size: 0 }
     
     const ct = res.headers.get('content-type') || ''
-    
-    // Reject HTML responses (some servers return HTML for missing resources)
     if (ct.includes('text/html')) return { ok: false, hash: null, contentType: ct, size: 0 }
     
-    // Must be an image
     const isImage = ct.includes('image/') || ct.includes('application/octet-stream') || !ct
     if (!isImage && ct) return { ok: false, hash: null, contentType: ct, size: 0 }
     
     const buffer = await res.arrayBuffer()
     const size = buffer.byteLength
-    
-    // Reject empty responses
     if (size === 0) return { ok: false, hash: null, contentType: ct, size: 0 }
     
     const hash = await computeHash(buffer)
-    
-    // Check against known default hashes
-    if (KNOWN_DEFAULT_HASHES.has(hash)) {
-      return { ok: false, hash, contentType: ct, size }
-    }
-    
+    if (KNOWN_DEFAULT_HASHES.has(hash)) return { ok: false, hash, contentType: ct, size }
     return { ok: true, hash, contentType: ct, size }
   } catch {
     return { ok: false, hash: null, contentType: null, size: 0 }
@@ -104,30 +67,27 @@ async function validateCandidate(url: string): Promise<{ ok: boolean, hash: stri
 }
 
 interface Candidate {
-  url: string
-  declaredSize: number     // Size from HTML sizes= attribute (e.g., 192x192 → 192)
-  isSvg: boolean
-  isPlatformDefault: boolean
-  isNextJsGenerated: boolean
-  isFaviconIco: boolean
-  isOgImage: boolean
-  isAppleTouchIcon: boolean
-  isManifestIcon: boolean
-  score?: number
+  url: string; declaredSize: number; isSvg: boolean; isPlatformDefault: boolean;
+  isNextJsGenerated: boolean; isFaviconIco: boolean; isOgImage: boolean;
+  isAppleTouchIcon: boolean; isManifestIcon: boolean; score?: number;
 }
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const urlParam = searchParams.get('url')
+  let urlParam = searchParams.get('url')?.trim()
 
   if (!urlParam) {
     return NextResponse.json({ error: 'Missing url' }, { status: 400 })
   }
 
-  const urlStr = urlParam.startsWith('http') ? urlParam : `https://${urlParam}`
+  // 1. Normalize Input Automatically
+  if (!/^https?:\/\//i.test(urlParam)) {
+    urlParam = `https://${urlParam}`
+  }
+
   let url: URL
   try {
-    url = new URL(urlStr)
+    url = new URL(urlParam)
   } catch (e) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
@@ -136,206 +96,205 @@ export async function GET(request: NextRequest) {
   const isPlatformDomain = PLATFORM_DOMAINS.some(d => cleanDomain.endsWith(d))
   const avatarFallback = `/api/avatar/${encodeURIComponent(cleanDomain)}`
 
+  // --- PLATFORM SPECIFIC EARLY RETURNS & VALIDATIONS ---
+
+  // Discord Invites
+  if (cleanDomain === 'discord.gg' || cleanDomain === 'discord.com') {
+    const inviteMatch = url.pathname.match(/\/(?:invite\/)?([a-zA-Z0-9-]+)/)
+    if (inviteMatch) {
+      try {
+        const res = await fetch(`https://discord.com/api/v9/invites/${inviteMatch[1]}`)
+        if (!res.ok) throw new Error('Invalid Invite')
+        const data = await res.json()
+        return NextResponse.json({
+          websiteUrl: urlParam,
+          domain: 'discord.gg',
+          websiteName: data.guild?.name || 'Discord Server',
+          logoUrl: data.guild?.icon ? `https://cdn.discordapp.com/icons/${data.guild.id}/${data.guild.icon}.png` : avatarFallback,
+          logoSource: data.guild?.icon ? 'detected' : 'fallback'
+        })
+      } catch (e) {
+        return NextResponse.json({ error: 'Invalid Discord Invite' }, { status: 400 })
+      }
+    }
+  }
+
   let websiteName = cleanDomain
   let finalLogoUrl = ''
   let logoSource = 'fallback'
-
-  // Store the first-encountered Next.js default hash so we can compare later candidates
   let knownNextJsHash: string | null = null
+  let html = ''
+  let status = 0
 
+  // 2. Fetch and Verify Existence
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const timeoutId = setTimeout(() => controller.abort(), 6000)
     
+    // We send a generic user agent that looks like a real browser to avoid instant blocks from some sites
     const res = await fetch(url.toString(), {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ReplaceMeBot/1.0; +https://replaceme.lol)' },
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      },
       signal: controller.signal,
       redirect: 'follow'
     })
     
     clearTimeout(timeoutId)
+    status = res.status
+    
+    // Platform-specific 404 strict rejections
+    const strict404Domains = ['github.com', 'youtube.com', 'tiktok.com', 'instagram.com', 'linkedin.com']
+    if (strict404Domains.some(d => cleanDomain.endsWith(d)) && status === 404) {
+      throw new Error('Social profile not found')
+    }
 
-    if (res.ok) {
-      const html = await res.text()
-      const $ = cheerio.load(html)
-      
-      // --- 1. Resolve Website Name ---
-      const ogSiteName = $('meta[property="og:site_name"]').attr('content')
-      const appName = $('meta[name="application-name"]').attr('content')
-      
-      if (ogSiteName) {
-        websiteName = ogSiteName.trim()
-      } else if (appName) {
-        websiteName = appName.trim()
-      } else {
-        // Check manifest for name
-        let manifestName = null
-        const manifestHref = $('link[rel="manifest"]').attr('href')
-        if (manifestHref) {
-           try {
-             const mRes = await fetch(resolveUrl(manifestHref, url), { signal: AbortSignal.timeout(3000) })
-             if (mRes.ok) {
-               const mJson = await mRes.json()
-               manifestName = mJson.name || mJson.short_name
-             }
-           } catch { /* ignore */ }
-        }
-        
-        if (manifestName) {
-          websiteName = manifestName.trim()
-        } else {
-          const title = $('title').text()
-          if (title) {
-            websiteName = title.trim()
-          }
-        }
-      }
+    // General 404 strict rejection for all normal sites
+    if (status === 404) {
+      throw new Error('Website not found (404)')
+    }
 
-      // --- 2. Collect Logo Candidates ---
-      const candidates: Candidate[] = []
-      const seenUrls = new Set<string>()
+    try {
+      html = await res.text()
+    } catch { html = '' }
 
-      const addCandidate = (href: string, opts: { type?: string, sizes?: string, isOg?: boolean, isAppleTouch?: boolean, isManifest?: boolean } = {}) => {
-        if (!href) return
-        const fullUrl = resolveUrl(href, url)
-        if (seenUrls.has(fullUrl)) return
-        seenUrls.add(fullUrl)
-        
-        let sizeScore = 0
-        if (opts.sizes && opts.sizes.includes('x')) {
-          sizeScore = parseInt(opts.sizes.split('x')[0], 10) || 0
-        }
-
-        const isNextJs = isLikelyNextJsDefaultIcon(fullUrl)
-        const isPlatformUrl = isPlatformDefaultUrl(fullUrl)
-
-        candidates.push({
-          url: fullUrl,
-          declaredSize: sizeScore,
-          isSvg: (opts.type === 'image/svg+xml') || fullUrl.endsWith('.svg'),
-          isFaviconIco: fullUrl.endsWith('/favicon.ico') || /\/favicon\.ico\?/.test(fullUrl),
-          isPlatformDefault: isPlatformUrl || (isPlatformDomain && isNextJs),
-          isNextJsGenerated: isNextJs,
-          isOgImage: opts.isOg || false,
-          isAppleTouchIcon: opts.isAppleTouch || false,
-          isManifestIcon: opts.isManifest || false,
-        })
-      }
-
-      // Manifest icons (high quality)
-      const manifestHref = $('link[rel="manifest"]').attr('href')
-      if (manifestHref) {
-        try {
-          const mRes = await fetch(resolveUrl(manifestHref, url), { signal: AbortSignal.timeout(3000) })
-          if (mRes.ok) {
-            const mJson = await mRes.json()
-            if (mJson.icons && Array.isArray(mJson.icons)) {
-              mJson.icons.forEach((icon: any) => addCandidate(icon.src, { type: icon.type, sizes: icon.sizes, isManifest: true }))
-            }
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Apple touch icons
-      $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => {
-        addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '', isAppleTouch: true })
-      })
-
-      // Standard icons
-      $('link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => {
-        addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '' })
-      })
-
-      // OG and Twitter images (demoted — these are typically wide banners, not square logos)
-      const ogImage = $('meta[property="og:image"]').attr('content')
-      if (ogImage) addCandidate(ogImage, { isOg: true })
-      const twitterImage = $('meta[name="twitter:image"]').attr('content')
-      if (twitterImage) addCandidate(twitterImage, { isOg: true })
-
-      // Default /favicon.ico (last resort)
-      addCandidate('/favicon.ico')
-
-      // --- 3. Score Candidates ---
-      for (const cand of candidates) {
-        let score = 0
-        
-        // Hard penalties for known platform defaults
-        if (cand.isPlatformDefault) {
-          score -= 2000
-        }
-
-        // Size-based scoring (bigger = better for icons)
-        if (cand.declaredSize >= 512) score += 500
-        else if (cand.declaredSize >= 192) score += 400
-        else if (cand.declaredSize >= 128) score += 300
-        else if (cand.declaredSize >= 64) score += 200
-        else if (cand.declaredSize > 0) score += 100
-        else score += 50  // unknown size
-
-        // Type bonuses
-        if (cand.isSvg && !cand.isPlatformDefault) score += 350   // SVGs are excellent for logos
-        if (cand.isAppleTouchIcon) score += 80                    // Apple touch icons are typically high quality
-        if (cand.isManifestIcon) score += 60                      // Manifest icons are usually well-curated
-        
-        // Penalties
-        if (cand.isFaviconIco) score -= 20                        // favicon.ico is often low quality
-        if (cand.isNextJsGenerated) score -= 500                  // Strong penalty for Next.js auto-generated paths
-        if (cand.isOgImage) score -= 200                          // OG images are banners, not logos
-
-        cand.score = score
-      }
-
-      // Sort by score descending
-      candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
-
-      console.log(`--- LOGO CANDIDATES FOR ${cleanDomain} ---`)
-      candidates.forEach(c => console.log(`  ${c.url} | score=${c.score} platform=${c.isPlatformDefault} nextjs=${c.isNextJsGenerated} og=${c.isOgImage}`))
-
-      // --- 4. Validate candidates by actually fetching them ---
-      for (const cand of candidates) {
-        // Skip candidates with deeply negative scores (known platform defaults)
-        if ((cand.score ?? 0) < -1000) continue
-
-        const validation = await validateCandidate(cand.url)
-        
-        if (!validation.ok) continue
-
-        // If this is a Next.js-generated path, compute the hash and remember it
-        // so we can also reject other icons with the same hash (same default icon served at different paths)
-        if (cand.isNextJsGenerated) {
-          if (knownNextJsHash === null && validation.hash) {
-            knownNextJsHash = validation.hash
-          }
-          // Even if validated as "ok", skip Next.js-generated icons — they are auto-generated
-          // and likely the platform default even if our hash list doesn't include them yet
-          continue
-        }
-
-        // If this icon has the same hash as a known Next.js default we saw, skip it
-        if (knownNextJsHash && validation.hash === knownNextJsHash) {
-          continue
-        }
-
-        // This candidate passed all checks
-        finalLogoUrl = cand.url
-        logoSource = 'detected'
-        break
+    // X / Twitter specific check (they return 404 sometimes, but also 200 with "User Profile Not Found")
+    if (cleanDomain === 'x.com' || cleanDomain === 'twitter.com') {
+      if (status === 404 || html.includes('<title>User Profile Not Found') || html.includes('Account suspended')) {
+        throw new Error('X account not found')
       }
     }
+    
+    // If we get here, it's either a 200 OK, a 403 (Cloudflare), 999 (LinkedIn bot block)
+    // We consider it VALID because the domain resolved and responded.
+    
   } catch (e) {
-    // If the initial fetch throws, it means DNS failed, connection refused, or timeout.
-    // The domain is unreachable or fake.
     console.error(`Metadata fetch error for ${cleanDomain}:`, e)
-    return NextResponse.json({ error: 'Unreachable website' }, { status: 400 })
+    return NextResponse.json({ error: 'Unreachable website or invalid profile' }, { status: 400 })
   }
 
-  // --- 5. Fallback ---
+  // --- 3. Extract Metadata ---
+  if (html) {
+    const $ = cheerio.load(html)
+    
+    const ogSiteName = $('meta[property="og:site_name"]').attr('content')
+    const ogTitle = $('meta[property="og:title"]').attr('content')
+    const appName = $('meta[name="application-name"]').attr('content')
+    
+    if (ogTitle && (cleanDomain.includes('x.com') || cleanDomain.includes('twitter.com') || cleanDomain.includes('youtube.com') || cleanDomain.includes('github.com'))) {
+      websiteName = ogTitle.trim() // X and YouTube put full name in og:title
+    } else if (ogSiteName) {
+      websiteName = ogSiteName.trim()
+    } else if (appName) {
+      websiteName = appName.trim()
+    } else {
+      const title = $('title').text()
+      if (title) websiteName = title.trim()
+    }
+
+    const candidates: Candidate[] = []
+    const seenUrls = new Set<string>()
+
+    const addCandidate = (href: string, opts: { type?: string, sizes?: string, isOg?: boolean, isAppleTouch?: boolean, isManifest?: boolean } = {}) => {
+      if (!href) return
+      const fullUrl = resolveUrl(href, url)
+      if (seenUrls.has(fullUrl)) return
+      seenUrls.add(fullUrl)
+      
+      let sizeScore = 0
+      if (opts.sizes && opts.sizes.includes('x')) {
+        sizeScore = parseInt(opts.sizes.split('x')[0], 10) || 0
+      }
+
+      const isNextJs = isLikelyNextJsDefaultIcon(fullUrl)
+      const isPlatformUrl = isPlatformDefaultUrl(fullUrl)
+
+      candidates.push({
+        url: fullUrl, declaredSize: sizeScore,
+        isSvg: (opts.type === 'image/svg+xml') || fullUrl.endsWith('.svg'),
+        isFaviconIco: fullUrl.endsWith('/favicon.ico') || /\/favicon\.ico\?/.test(fullUrl),
+        isPlatformDefault: isPlatformUrl || (isPlatformDomain && isNextJs),
+        isNextJsGenerated: isNextJs, isOgImage: opts.isOg || false,
+        isAppleTouchIcon: opts.isAppleTouch || false, isManifestIcon: opts.isManifest || false,
+      })
+    }
+
+    const manifestHref = $('link[rel="manifest"]').attr('href')
+    if (manifestHref) {
+      try {
+        const mRes = await fetch(resolveUrl(manifestHref, url), { signal: AbortSignal.timeout(2000) })
+        if (mRes.ok) {
+          const mJson = await mRes.json()
+          if (mJson.icons && Array.isArray(mJson.icons)) {
+            mJson.icons.forEach((icon: any) => addCandidate(icon.src, { type: icon.type, sizes: icon.sizes, isManifest: true }))
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    $('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]').each((_, el) => addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '', isAppleTouch: true }))
+    $('link[rel="icon"], link[rel="shortcut icon"]').each((_, el) => addCandidate($(el).attr('href') || '', { type: $(el).attr('type') || '', sizes: $(el).attr('sizes') || '' }))
+    
+    const ogImage = $('meta[property="og:image"]').attr('content')
+    if (ogImage) addCandidate(ogImage, { isOg: true })
+    const twitterImage = $('meta[name="twitter:image"]').attr('content')
+    if (twitterImage) addCandidate(twitterImage, { isOg: true })
+
+    addCandidate('/favicon.ico')
+
+    for (const cand of candidates) {
+      let score = 0
+      if (cand.isPlatformDefault) score -= 2000
+      
+      // Give massive boost to OG image for social profiles because it's usually their avatar
+      if (cand.isOgImage && (cleanDomain.includes('x.com') || cleanDomain.includes('twitter.com') || cleanDomain.includes('github.com') || cleanDomain.includes('youtube.com') || cleanDomain.includes('instagram.com'))) {
+        score += 1000
+      }
+
+      if (cand.declaredSize >= 512) score += 500
+      else if (cand.declaredSize >= 192) score += 400
+      else if (cand.declaredSize >= 128) score += 300
+      else if (cand.declaredSize >= 64) score += 200
+      else if (cand.declaredSize > 0) score += 100
+      else score += 50
+
+      if (cand.isSvg && !cand.isPlatformDefault) score += 350
+      if (cand.isAppleTouchIcon) score += 80
+      if (cand.isManifestIcon) score += 60
+      if (cand.isFaviconIco) score -= 20
+      if (cand.isNextJsGenerated) score -= 500
+      // Normal OG images (non-social) get penalized as banners
+      if (cand.isOgImage && score < 1000) score -= 200
+
+      cand.score = score
+    }
+
+    candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
+
+    for (const cand of candidates) {
+      if ((cand.score ?? 0) < -1000) continue
+      const validation = await validateCandidate(cand.url)
+      if (!validation.ok) continue
+
+      if (cand.isNextJsGenerated) {
+        if (knownNextJsHash === null && validation.hash) knownNextJsHash = validation.hash
+        continue
+      }
+      if (knownNextJsHash && validation.hash === knownNextJsHash) continue
+
+      finalLogoUrl = cand.url
+      logoSource = 'detected'
+      break
+    }
+  }
+
   if (!finalLogoUrl) {
     finalLogoUrl = avatarFallback
     logoSource = 'fallback'
   }
 
-  // Capitalize fallback name if it's still a bare domain
   if (websiteName === cleanDomain) {
     const nameParts = cleanDomain.split('.')
     const nameFallback = nameParts[0] || cleanDomain
@@ -343,7 +302,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    websiteUrl: urlStr,
+    websiteUrl: urlParam,
     domain: cleanDomain,
     websiteName: websiteName,
     logoUrl: finalLogoUrl,

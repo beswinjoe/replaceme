@@ -13,8 +13,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Website URL is required' }, { status: 400 })
     }
 
-    if (!bid_amount || isNaN(Number(bid_amount)) || Number(bid_amount) < 1) {
-      return NextResponse.json({ error: 'Valid bid amount is required (minimum $1)' }, { status: 400 })
+    if (!bid_amount || isNaN(Number(bid_amount)) || Number(bid_amount) < 0.10) {
+      return NextResponse.json({ error: 'Valid bid amount is required (minimum $0.10)' }, { status: 400 })
     }
 
     // Convert bid to cents for Dodo Payments (multiply by 100)

@@ -34,7 +34,7 @@ function HeroSection({
   websiteStatus,
 }: any) {
   const bidNum = Number(quickBidAmount)
-  const hasValidBid = !isNaN(bidNum) && bidNum >= 1.00
+  const hasValidBid = !isNaN(bidNum) && bidNum >= 0.10
 
   return (
     <section className="w-full flex flex-col items-center mt-6 md:mt-10 mb-8 md:mb-12">
@@ -49,7 +49,7 @@ function HeroSection({
         Join the ranking.
       </h1>
       <p className="text-sm md:text-base text-gray-500 font-medium mb-8">
-        Bid any amount. Higher bids rank higher. Minimum $1.
+        Bid any amount. Higher bids rank higher. Minimum $0.10.
       </p>
 
       <form 
@@ -83,9 +83,9 @@ function HeroSection({
           <span className="text-gray-400 font-medium mr-1">$</span>
           <input 
             type="number" 
-            min="1.00"
-            step="1.00"
-            placeholder="5.00" 
+            min="0.10"
+            step="0.01"
+            placeholder="0.10" 
             value={quickBidAmount}
             onChange={(e) => setQuickBidAmount(e.target.value)}
             className="w-full bg-transparent outline-none text-sm font-bold text-[#1a1a1a] placeholder-gray-400"
@@ -433,8 +433,8 @@ function HomeContent() {
     }
     
     const bidNum = Number(quickBidAmount)
-    if (isNaN(bidNum) || bidNum < 1.00) {
-      setQuickError('Minimum bid is $1.00.')
+    if (isNaN(bidNum) || bidNum < 0.10) {
+      setQuickError('Minimum bid is $0.10.')
       return
     }
 
