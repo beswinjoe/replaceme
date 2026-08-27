@@ -539,15 +539,15 @@ function HomeContent() {
         {/* Statistics Block */}
         {stats && (
           <div className="mt-20 w-full flex flex-col items-center justify-center">
-            <p className="text-sm font-semibold text-[var(--muted)] mb-4 uppercase tracking-widest">
-              This simple side project made
+            <p className="text-sm font-medium text-gray-500 mb-4">
+              This <span className="text-[#e2735a]">simple side project</span> made
             </p>
-            <div className="bg-white dark:bg-black border border-[var(--border-soft)] shadow-xl shadow-black/5 dark:shadow-white/5 rounded-3xl px-12 py-6 mb-4 flex items-center justify-center transform hover:scale-[1.02] transition-transform">
-               <span className="text-5xl sm:text-6xl md:text-7xl font-black tabular-nums tracking-tighter text-[var(--foreground)] drop-shadow-sm">
-                  <span className="text-[#e2735a]">$</span>{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            <div className="bg-white dark:bg-[#111] shadow-[0_0_50px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_0_50px_-12px_rgba(255,255,255,0.05)] rounded-[32px] px-16 py-8 mb-6 flex items-center justify-center">
+               <span className="text-6xl sm:text-7xl md:text-[80px] font-black tabular-nums tracking-tight text-[#1a1a1a] dark:text-white leading-none">
+                  <span className="text-[#e2735a] font-bold mr-1">$</span>{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                </span>
             </div>
-            <p className="text-sm font-semibold text-[var(--muted)]">
+            <p className="text-sm font-medium text-gray-500">
               since its launch {stats.hoursAgo.toLocaleString()} hours ago
             </p>
           </div>
