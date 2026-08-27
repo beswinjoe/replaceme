@@ -138,9 +138,15 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
   const isNumberOne = rank === 1;
   const domain = participant.new_website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')
   const initial = (participant.new_website_name || domain || '?').charAt(0).toUpperCase()
+  const clickUrl = `/api/click/${participant.id}?url=${encodeURIComponent(participant.new_website_url)}`
   
   return (
-    <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 transition-all ${isNumberOne ? 'shadow-[0_4px_32px_rgba(226,115,90,0.15)] border-b-2 border-b-[#e2735a]/20 bg-gradient-to-r from-orange-50/50 via-white to-white relative z-10' : 'border-b border-gray-100 bg-white hover:bg-gray-50/50'}`}>
+    <a 
+      href={clickUrl} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 transition-all ${isNumberOne ? 'shadow-[0_4px_32px_rgba(226,115,90,0.15)] border-b-2 border-b-[#e2735a]/20 bg-gradient-to-r from-orange-50/50 via-white to-white relative z-10' : 'border-b border-gray-100 bg-white hover:bg-gray-50/50'}`}
+    >
       
       <div className="flex items-center gap-4 sm:gap-6 min-w-0 w-full sm:w-auto mb-3 sm:mb-0">
         <div className="flex flex-col items-center justify-center w-10 shrink-0">
@@ -196,11 +202,11 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
       </div>
       
       <div className="flex w-full sm:w-auto items-center justify-end sm:pl-4 shrink-0">
-        <span className="text-lg sm:text-xl font-bold tabular-nums tracking-tight text-[#e2735a]">
+        <span className="text-lg sm:text-xl font-bold tabular-nums tracking-tight text-[#e2735a] group-hover:text-orange-600 transition-colors">
           ${Number(participant.amount_paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
-    </div>
+    </a>
   )
 }
 
@@ -358,6 +364,8 @@ function HomeContent() {
     }
   }, [quickWebsiteUrl])
 
+  const viewedIdsRef = useRef<Set<string>>(new Set())
+
   const fetchGameState = useCallback(async (page: number, isInitial = false) => {
     try {
       if (isInitial) setLoading(true)
@@ -375,6 +383,16 @@ function HomeContent() {
       if (data) {
         setLeaderboard(data)
         if (count !== null) setTotalCount(count)
+        
+        const newIds = data.map(item => item.id).filter(id => !viewedIdsRef.current.has(id))
+        if (newIds.length > 0) {
+          newIds.forEach(id => viewedIdsRef.current.add(id))
+          fetch('/api/view-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: newIds })
+          }).catch(console.error)
+        }
       }
       setError(false)
     } catch (err: any) {
