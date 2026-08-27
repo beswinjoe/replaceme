@@ -1,11 +1,10 @@
 'use client'
 
-import { Suspense, useEffect, useState, FormEvent, useCallback } from 'react'
+import { Suspense, useEffect, useState, useRef, FormEvent, useCallback } from 'react'
 import { Header } from '@/components/Header'
 import { createClient } from '@/utils/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Globe, RefreshCw } from 'lucide-react'
-import Link from 'next/link'
 
 // --- HELPER COMPONENTS ---
 
@@ -29,21 +28,12 @@ function HeroSection({
   setQuickBidAmount,
   triggerCheckout,
   quickError,
-  leaderboard,
-  loadingPayment
+  estimatedRank,
+  loadingPayment,
+  loadingRank,
 }: any) {
-  // Estimate rank dynamically
-  const estimatedRank = (() => {
-    const amount = Number(quickBidAmount)
-    if (isNaN(amount) || amount <= 0) return null
-    let rank = 1
-    for (const participant of leaderboard) {
-      if (Number(participant.amount_paid) >= amount) {
-        rank++
-      }
-    }
-    return rank
-  })()
+  const bidNum = Number(quickBidAmount)
+  const hasBid = !isNaN(bidNum) && bidNum > 0
 
   return (
     <section className="w-full flex flex-col items-center mt-6 md:mt-10 mb-8 md:mb-12">
@@ -58,7 +48,7 @@ function HeroSection({
         Join the ranking.
       </h1>
       <p className="text-sm md:text-base text-gray-500 font-medium mb-8">
-        Bid any amount. Higher bids rank higher. No limits.
+        Bid any amount. Higher bids rank higher. Minimum $1.
       </p>
 
       <form 
@@ -106,7 +96,7 @@ function HeroSection({
           disabled={loadingPayment}
           className="bg-[#1a1a1a] dark:bg-white text-white dark:text-[#1a1a1a] px-6 py-2 rounded-xl md:rounded-full text-sm font-bold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loadingPayment ? '...' : 'Outbid →'}
+          {loadingPayment ? '...' : hasBid ? `Join for $${bidNum}` : 'Join'}
         </button>
       </form>
       
@@ -115,12 +105,16 @@ function HeroSection({
           <div className="text-[#e2735a] font-semibold text-xs">
             {quickError}
           </div>
-        ) : estimatedRank ? (
+        ) : estimatedRank !== null ? (
           <div className="text-gray-500 text-xs font-medium">
-            This would place you at <strong className="text-[#1a1a1a] dark:text-white">#{estimatedRank}</strong>
+            {loadingRank ? (
+              <span className="text-gray-400">Estimating rank…</span>
+            ) : (
+              <>Estimated rank <strong className="text-[#1a1a1a] dark:text-white">#{estimatedRank}</strong> — confirmed after payment.</>
+            )}
           </div>
         ) : (
-          <div className="text-transparent text-xs">Spacer</div>
+          <div className="text-transparent text-xs select-none" aria-hidden>.</div>
         )}
       </div>
     </section>
@@ -129,7 +123,8 @@ function HeroSection({
 
 function LeaderboardItem({ participant, rank }: { participant: any, rank: number }) {
   const isNumberOne = rank === 1;
-  const isTopThree = rank <= 3;
+  const domain = participant.new_website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const initial = (participant.new_website_name || domain || '?').charAt(0).toUpperCase()
   
   return (
     <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800/50 bg-white dark:bg-black hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors ${isNumberOne ? 'bg-orange-50/20 dark:bg-orange-950/10' : ''}`}>
@@ -148,8 +143,8 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
             className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-contain border border-gray-100 dark:border-gray-800 shrink-0 bg-white dark:bg-black"
           />
         ) : (
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 font-bold text-[10px]">
-            URL
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg border border-gray-100 dark:border-gray-800 shrink-0 bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-500 font-bold text-base select-none">
+            {initial}
           </div>
         )}
 
@@ -159,7 +154,7 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
               {participant.new_website_name}
             </span>
             <span className="hidden sm:inline text-xs font-medium text-gray-400 truncate">
-              {participant.new_website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              {domain}
             </span>
           </div>
           
@@ -176,15 +171,15 @@ function LeaderboardItem({ participant, rank }: { participant: any, rank: number
           <div className="flex items-center gap-3 mt-1 sm:mt-1.5 text-[11px] font-medium text-gray-400">
              <span>{timeAgo(participant.created_at)}</span>
              <span className="sm:hidden text-gray-400 truncate">
-               • {participant.new_website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+               • {domain}
              </span>
           </div>
         </div>
       </div>
       
       <div className="flex w-full sm:w-auto items-center justify-end sm:pl-4 shrink-0">
-        <span className={`text-lg sm:text-xl font-bold tabular-nums tracking-tight ${isNumberOne ? 'text-[#e2735a]' : 'text-[#e2735a]'}`}>
-          ${Number(participant.amount_paid).toFixed(2)}
+        <span className="text-lg sm:text-xl font-bold tabular-nums tracking-tight text-[#e2735a]">
+          ${Number(participant.amount_paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
     </div>
@@ -219,7 +214,6 @@ function HomeContent() {
   
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [stats, setStats] = useState<{ totalAmount: number, hoursAgo: number } | null>(null)
   const [loadingPayment, setLoadingPayment] = useState(false)
 
   // Quick form state
@@ -227,6 +221,42 @@ function HomeContent() {
   const [quickMessage, setQuickMessage] = useState('')
   const [quickBidAmount, setQuickBidAmount] = useState('')
   const [quickError, setQuickError] = useState('')
+
+  // Server-side estimated rank
+  const [estimatedRank, setEstimatedRank] = useState<number | null>(null)
+  const [loadingRank, setLoadingRank] = useState(false)
+  const rankDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Fetch estimated rank from server when bid amount changes
+  useEffect(() => {
+    const amount = Number(quickBidAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setEstimatedRank(null)
+      return
+    }
+
+    // Debounce the API call by 400ms
+    if (rankDebounceRef.current) clearTimeout(rankDebounceRef.current)
+    setLoadingRank(true)
+
+    rankDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/estimated-rank?amount=${encodeURIComponent(amount)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setEstimatedRank(data.estimatedRank)
+        }
+      } catch {
+        // silently fail, rank estimation is non-critical
+      } finally {
+        setLoadingRank(false)
+      }
+    }, 400)
+
+    return () => {
+      if (rankDebounceRef.current) clearTimeout(rankDebounceRef.current)
+    }
+  }, [quickBidAmount])
 
   const fetchGameState = useCallback(async (page: number, isInitial = false) => {
     try {
@@ -245,25 +275,6 @@ function HomeContent() {
       if (data) {
         setLeaderboard(data)
         if (count !== null) setTotalCount(count)
-      }
-
-      // Try fetching total stats only on initial load
-      if (isInitial) {
-        try {
-          const { data: statsData, error: statsErr } = await supabase.rpc('get_leaderboard_stats')
-          if (!statsErr && statsData) {
-             const hours = statsData.launch_date 
-               ? Math.max(1, Math.floor((new Date().getTime() - new Date(statsData.launch_date).getTime()) / (1000 * 60 * 60)))
-               : 0
-             setStats({ totalAmount: Number(statsData.total_amount), hoursAgo: hours })
-          } else {
-             const sum = (data || []).reduce((acc: number, val: any) => acc + Number(val.amount_paid || 0), 0)
-             setStats({ totalAmount: sum, hoursAgo: 24 })
-          }
-        } catch (e) {
-             const sum = (data || []).reduce((acc: number, val: any) => acc + Number(val.amount_paid || 0), 0)
-             setStats({ totalAmount: sum, hoursAgo: 24 })
-        }
       }
       setError(false)
     } catch (err: any) {
@@ -414,9 +425,9 @@ function HomeContent() {
   const displayStart = (currentPage - 1) * PAGE_SIZE + 1
   const displayEnd = Math.min(currentPage * PAGE_SIZE, totalCount)
 
-  // Custom Pagination Component matching the screenshot
+  // Custom Pagination Component
   const renderPagination = () => {
-    const pages = [];
+    const pages: (number | string)[] = [];
     if (totalPages <= 5) {
       for (let i = 1; i <= totalPages; i++) pages.push(i)
     } else {
@@ -467,10 +478,8 @@ function HomeContent() {
           </button>
         </div>
         
-        <div className="flex items-center justify-between w-full max-w-[200px]">
-          <div className="text-xs font-medium text-gray-500 w-full text-center">
-            {displayStart} - {displayEnd} of {totalCount.toLocaleString()}
-          </div>
+        <div className="text-xs font-medium text-gray-500 text-center">
+          {displayStart} – {displayEnd} of {totalCount.toLocaleString()}
         </div>
       </div>
     )
@@ -491,8 +500,9 @@ function HomeContent() {
           setQuickBidAmount={(val: string) => { setQuickBidAmount(val); setQuickError(''); }}
           triggerCheckout={triggerCheckout}
           quickError={quickError}
-          leaderboard={leaderboard}
+          estimatedRank={estimatedRank}
           loadingPayment={loadingPayment}
+          loadingRank={loadingRank}
         />
 
         <section className="w-full">
@@ -524,7 +534,7 @@ function HomeContent() {
                   {renderPagination()}
                 </div>
                 <button 
-                  onClick={() => fetchGameState(currentPage, true)}
+                  onClick={() => fetchGameState(currentPage, false)}
                   className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -534,23 +544,6 @@ function HomeContent() {
             </>
           )}
         </section>
-        
-        {/* Statistics Block */}
-        {stats && (
-          <div className="mt-32 w-full flex flex-col items-center justify-center">
-            <p className="text-sm font-medium text-gray-500 mb-4">
-              This <span className="text-[#e2735a]">simple side project</span> made
-            </p>
-            <div className="bg-white dark:bg-[#111] shadow-[0_0_50px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_0_50px_-12px_rgba(255,255,255,0.05)] rounded-[32px] px-12 md:px-24 py-8 mb-6 flex items-center justify-center transform hover:scale-[1.02] transition-transform">
-               <span className="text-6xl sm:text-[80px] md:text-[100px] font-black tabular-nums tracking-tight text-[#1a1a1a] dark:text-white leading-none">
-                  <span className="text-[#e2735a] font-bold mr-2 md:mr-3">$</span>{stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-               </span>
-            </div>
-            <p className="text-sm font-medium text-gray-500">
-              since its launch {stats.hoursAgo.toLocaleString()} hours ago
-            </p>
-          </div>
-        )}
 
       </main>
     </>

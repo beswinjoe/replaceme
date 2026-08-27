@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // 1. Fetch current holder and replacements that need checking
+  // 1. Fetch all replacements that need logo checking
   // We'll just fetch all replacements, it's a small dataset early on.
   const { data: replacements, error: repError } = await supabase
     .from('replacements')

@@ -26,7 +26,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
   const supabase = await createClient()
 
-  // 1. Check if this domain is the current holder
+  // 1. Check if this domain is the #1 ranked participant
   const { data: currentHolder } = await supabase
     .from('current_holder')
     .select('*')
